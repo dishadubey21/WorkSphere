@@ -68,6 +68,11 @@ class TaskService {
     const task = new Task(data);
     await task.save();
 
+    if (task.assignee) {
+      const notificationService = (await import('./notification.service.js')).default;
+      await notificationService.notifyTaskAssignment(task.assignee, task.title);
+    }
+
     await logActivity({
       action: 'Created',
       entity: 'Task',
@@ -86,8 +91,51 @@ class TaskService {
       throw error;
     }
 
+    const oldAssignee = task.assignee;
+    const assigneeChanged = data.assignee && data.assignee.toString() !== (oldAssignee ? oldAssignee.toString() : '');
+    const oldStatus = task.status;
+    const statusChanged = data.status && data.status !== oldStatus;
+    const newStatus = data.status;
+
     Object.assign(task, data);
     await task.save();
+
+    const notificationService = (await import('./notification.service.js')).default;
+
+    if (assigneeChanged) {
+      if (oldAssignee) {
+        await notificationService.notifyTaskRemoval(oldAssignee, task.title);
+      }
+      if (task.assignee) {
+        await notificationService.notifyTaskAssignment(task.assignee, task.title);
+      }
+    }
+
+    if (statusChanged && task.assignee) {
+      await notificationService.create({
+        title: 'Task Status Updated',
+        message: `The status of your task "${task.title}" has been updated to "${newStatus}".`,
+        category: 'Task',
+        recipient: task.assignee,
+        isRead: false
+      });
+    }
+
+    if (statusChanged && newStatus === 'Done') {
+      // Find assignee's manager or Admin
+      if (task.assignee) {
+        const Employee = (await import('../models/Employee.js')).default;
+        const assigneeEmp = await Employee.findById(task.assignee);
+        let managerId = assigneeEmp ? assigneeEmp.manager : null;
+        if (!managerId) {
+          const adminUser = await Employee.findOne({ role: 'Admin' });
+          managerId = adminUser ? adminUser._id : null;
+        }
+        if (managerId) {
+          await notificationService.notifyTaskCompleted(managerId, assigneeEmp ? assigneeEmp.name : 'Employee', task.title);
+        }
+      }
+    }
 
     await logActivity({
       action: 'Updated',

@@ -16,7 +16,7 @@ import Avatar from '../design-system/Avatar.jsx';
 import PageLayout from '../layouts/PageLayout.jsx';
 
 // APIs
-import { getSettingsApi, updateSettingsApi } from '../api/settings.api.js';
+import { getSettingsApi, updateSettingsApi, getPersonalSettingsApi, updatePersonalSettingsApi } from '../api/settings.api.js';
 import { getEmployeesApi, updateEmployeeApi } from '../api/employee.api.js';
 
 export const Settings = () => {
@@ -34,7 +34,16 @@ export const Settings = () => {
   // TAB 1: Profile Settings & Password Change
   // ==========================================
   const { register: registerProfile, handleSubmit: handleSubmitProfile, reset: resetProfile, formState: { errors: profileErrors } } = useForm({
-    defaultValues: { name: '', email: '', phone: '', designation: '', avatar: '' }
+    defaultValues: {
+      name: '',
+      email: '',
+      phone: '',
+      designation: '',
+      avatar: '',
+      address: '',
+      emergencyContact: '',
+      bio: ''
+    }
   });
 
   const { register: registerPassword, handleSubmit: handleSubmitPassword, watch: watchPassword, reset: resetPasswordForm, formState: { errors: passwordErrors } } = useForm({
@@ -51,7 +60,10 @@ export const Settings = () => {
         email: user.email || '',
         phone: user.phone || '',
         designation: user.designation || '',
-        avatar: user.avatar || ''
+        avatar: user.avatar || '',
+        address: user.address || '',
+        emergencyContact: user.emergencyContact || '',
+        bio: user.bio || ''
       });
     }
   }, [user, resetProfile]);
@@ -83,6 +95,38 @@ export const Settings = () => {
     } finally {
       setPasswordLoading(false);
     }
+  };
+
+
+  // ==========================================
+  // TAB: Personal Settings (Theme & Notifications)
+  // ==========================================
+  const { data: personalData, isLoading: personalLoading } = useQuery({
+    queryKey: ['personal-settings'],
+    queryFn: () => getPersonalSettingsApi()
+  });
+
+  const { register: registerPersonal, handleSubmit: handleSubmitPersonal, reset: resetPersonal } = useForm();
+
+  useEffect(() => {
+    if (personalData?.settings) {
+      resetPersonal(personalData.settings);
+    }
+  }, [personalData, resetPersonal]);
+
+  const personalMutation = useMutation({
+    mutationFn: (newData) => updatePersonalSettingsApi(newData),
+    onSuccess: (res) => {
+      showToast(res.message || 'Personal settings updated successfully', 'success');
+      queryClient.invalidateQueries({ queryKey: ['personal-settings'] });
+    },
+    onError: (err) => {
+      showToast(err.message, 'danger');
+    }
+  });
+
+  const onUpdatePersonal = (formData) => {
+    personalMutation.mutate(formData);
   };
 
 
@@ -167,6 +211,30 @@ export const Settings = () => {
                 <Icons.User size={16} className="me-2.5" /> Personal Profile
               </button>
 
+              <button
+                type="button"
+                className={`nav-link text-start py-2.5 px-3 rounded-2 fs-7 fw-medium transition-all border-0 bg-transparent ${activeTab === 'security' ? 'bg-ws-primary-light text-ws-primary fw-bold' : 'text-muted hover-bg-light'}`}
+                onClick={() => setActiveTab('security')}
+              >
+                <Icons.Lock size={16} className="me-2.5" /> Security / Credentials
+              </button>
+
+              <button
+                type="button"
+                className={`nav-link text-start py-2.5 px-3 rounded-2 fs-7 fw-medium transition-all border-0 bg-transparent ${activeTab === 'notifications' ? 'bg-ws-primary-light text-ws-primary fw-bold' : 'text-muted hover-bg-light'}`}
+                onClick={() => setActiveTab('notifications')}
+              >
+                <Icons.Bell size={16} className="me-2.5" /> Notifications
+              </button>
+
+              <button
+                type="button"
+                className={`nav-link text-start py-2.5 px-3 rounded-2 fs-7 fw-medium transition-all border-0 bg-transparent ${activeTab === 'appearance' ? 'bg-ws-primary-light text-ws-primary fw-bold' : 'text-muted hover-bg-light'}`}
+                onClick={() => setActiveTab('appearance')}
+              >
+                <Icons.Kanban size={16} className="me-2.5" /> Theme & Appearance
+              </button>
+
               {isAdmin && (
                 <>
                   <button
@@ -213,6 +281,7 @@ export const Settings = () => {
                         label="Full Name"
                         name="name"
                         required
+                        disabled={!isAdmin}
                         error={profileErrors.name?.message}
                         {...registerProfile('name', { required: 'Name is required' })}
                       />
@@ -222,6 +291,7 @@ export const Settings = () => {
                         label="Email Address"
                         name="email"
                         required
+                        disabled={!isAdmin}
                         error={profileErrors.email?.message}
                         {...registerProfile('email', { required: 'Email is required' })}
                       />
@@ -243,8 +313,30 @@ export const Settings = () => {
                         label="Designation"
                         name="designation"
                         required
+                        disabled={!isAdmin}
                         error={profileErrors.designation?.message}
                         {...registerProfile('designation', { required: 'Designation is required' })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="row g-3">
+                    <div className="col-12 col-sm-6">
+                      <Input
+                        label="Emergency Contact"
+                        name="emergencyContact"
+                        placeholder="Name - Phone"
+                        error={profileErrors.emergencyContact?.message}
+                        {...registerProfile('emergencyContact')}
+                      />
+                    </div>
+                    <div className="col-12 col-sm-6">
+                      <Input
+                        label="Home Address"
+                        name="address"
+                        placeholder="123 Corporate Blvd, City, ST"
+                        error={profileErrors.address?.message}
+                        {...registerProfile('address')}
                       />
                     </div>
                   </div>
@@ -258,6 +350,16 @@ export const Settings = () => {
                     />
                   </div>
 
+                  <div className="mb-2">
+                    <label className="form-label font-body fs-7 text-dark fw-medium mb-1.5">Personal Biography</label>
+                    <textarea
+                      className="form-control bg-light border-0 py-2 fs-7"
+                      rows={3}
+                      placeholder="Write a brief bio about yourself..."
+                      {...registerProfile('bio')}
+                    />
+                  </div>
+
                   <div className="text-end">
                     <Button type="submit" loading={profileLoading} icon={<Icons.Check size={16} />}>
                       Save Changes
@@ -265,54 +367,141 @@ export const Settings = () => {
                   </div>
                 </form>
               </Card>
+            </div>
+          )}
 
-              {/* Password Change Form */}
-              <Card className="p-4 border border-light shadow-sm">
-                <form onSubmit={handleSubmitPassword(onChangePassword)} className="d-flex flex-column gap-3.5">
-                  <div className="border-bottom pb-2 mb-2">
-                    <Typography variant="h3" className="mb-0 text-danger">Change Secure Password</Typography>
-                    <p className="text-muted fs-8 mb-0">Provide a secure new password for your enterprise credential access.</p>
+          {/* TAB: Security / Credentials */}
+          {activeTab === 'security' && (
+            <Card className="p-4 border border-light shadow-sm">
+              <form onSubmit={handleSubmitPassword(onChangePassword)} className="d-flex flex-column gap-3.5">
+                <div className="border-bottom pb-2 mb-2">
+                  <Typography variant="h3" className="mb-0 text-danger">Change Secure Password</Typography>
+                  <p className="text-muted fs-8 mb-0">Provide a secure new password for your enterprise credential access.</p>
+                </div>
+
+                <div className="row g-3">
+                  <div className="col-12 col-sm-6">
+                    <Input
+                      label="New Password"
+                      name="password"
+                      type="password"
+                      placeholder="••••••••"
+                      required
+                      error={passwordErrors.password?.message}
+                      {...registerPassword('password', {
+                        required: 'Password is required',
+                        minLength: { value: 6, message: 'Password must be at least 6 characters' }
+                      })}
+                    />
+                  </div>
+                  <div className="col-12 col-sm-6">
+                    <Input
+                      label="Confirm New Password"
+                      name="confirmPassword"
+                      type="password"
+                      placeholder="••••••••"
+                      required
+                      error={passwordErrors.confirmPassword?.message}
+                      {...registerPassword('confirmPassword', {
+                        required: 'Please confirm password',
+                        validate: value => value === newPasswordVal || 'Passwords do not match'
+                      })}
+                    />
+                  </div>
+                </div>
+
+                <div className="text-end">
+                  <Button type="submit" loading={passwordLoading} variant="danger" icon={<Icons.Check size={16} />}>
+                    Update Password
+                  </Button>
+                </div>
+              </form>
+            </Card>
+          )}
+
+          {/* TAB: Notifications */}
+          {activeTab === 'notifications' && (
+            <Card className="p-4 border border-light shadow-sm">
+              <Typography variant="h3" className="mb-3 border-bottom pb-2">Notification Preferences</Typography>
+              {personalLoading ? (
+                <div className="text-center py-4 text-muted fs-8">Loading notification preferences...</div>
+              ) : (
+                <form onSubmit={handleSubmitPersonal(onUpdatePersonal)} className="d-flex flex-column gap-3.5">
+                  <div className="form-check">
+                    <input
+                      type="checkbox"
+                      id="emailNotifications"
+                      className="form-check-input"
+                      {...registerPersonal('emailNotifications')}
+                    />
+                    <label htmlFor="emailNotifications" className="form-check-label fs-7 fw-medium text-dark">
+                      Email Notifications
+                    </label>
+                    <p className="text-muted fs-8 mb-0">Receive email alerts for task assignments, comments, and milestones.</p>
                   </div>
 
-                  <div className="row g-3">
-                    <div className="col-12 col-sm-6">
-                      <Input
-                        label="New Password"
-                        name="password"
-                        type="password"
-                        placeholder="••••••••"
-                        required
-                        error={passwordErrors.password?.message}
-                        {...registerPassword('password', {
-                          required: 'Password is required',
-                          minLength: { value: 6, message: 'Password must be at least 6 characters' }
-                        })}
-                      />
-                    </div>
-                    <div className="col-12 col-sm-6">
-                      <Input
-                        label="Confirm New Password"
-                        name="confirmPassword"
-                        type="password"
-                        placeholder="••••••••"
-                        required
-                        error={passwordErrors.confirmPassword?.message}
-                        {...registerPassword('confirmPassword', {
-                          required: 'Please confirm password',
-                          validate: value => value === newPasswordVal || 'Passwords do not match'
-                        })}
-                      />
-                    </div>
+                  <div className="form-check">
+                    <input
+                      type="checkbox"
+                      id="pushNotifications"
+                      className="form-check-input"
+                      {...registerPersonal('pushNotifications')}
+                    />
+                    <label htmlFor="pushNotifications" className="form-check-label fs-7 fw-medium text-dark">
+                      Push Notifications
+                    </label>
+                    <p className="text-muted fs-8 mb-0">Show real-time notifications in the sidebar dropdown widget.</p>
                   </div>
 
-                  <div className="text-end">
-                    <Button type="submit" loading={passwordLoading} variant="danger" icon={<Icons.Check size={16} />}>
-                      Update Password
+                  <div className="form-check">
+                    <input
+                      type="checkbox"
+                      id="smsAlerts"
+                      className="form-check-input"
+                      {...registerPersonal('smsAlerts')}
+                    />
+                    <label htmlFor="smsAlerts" className="form-check-label fs-7 fw-medium text-dark">
+                      SMS/Mobile Text Alerts
+                    </label>
+                    <p className="text-muted fs-8 mb-0">Receive critical emergency or holiday notifications on your registered phone.</p>
+                  </div>
+
+                  <div className="text-end border-top pt-3 mt-2">
+                    <Button type="submit" loading={personalMutation.isPending} icon={<Icons.Check size={16} />}>
+                      Save Notification Preferences
                     </Button>
                   </div>
                 </form>
-              </Card>
-            </div>
+              )}
+            </Card>
+          )}
+
+          {/* TAB: Appearance */}
+          {activeTab === 'appearance' && (
+            <Card className="p-4 border border-light shadow-sm">
+              <Typography variant="h3" className="mb-3 border-bottom pb-2">Theme & Style Preferences</Typography>
+              {personalLoading ? (
+                <div className="text-center py-4 text-muted fs-8">Loading appearance settings...</div>
+              ) : (
+                <form onSubmit={handleSubmitPersonal(onUpdatePersonal)} className="d-flex flex-column gap-3.5">
+                  <Select
+                    label="Theme Mode Selection"
+                    name="theme"
+                    options={[
+                      { value: 'light', label: 'WorkSphere Standard Light' },
+                      { value: 'dark', label: 'Enterprise Dark (Omitted in this scope)' }
+                    ]}
+                    {...registerPersonal('theme')}
+                  />
+
+                  <div className="text-end border-top pt-3 mt-2">
+                    <Button type="submit" loading={personalMutation.isPending} icon={<Icons.Check size={16} />}>
+                      Save Appearance Settings
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </Card>
           )}
 
           {/* TAB 2: System Config */}

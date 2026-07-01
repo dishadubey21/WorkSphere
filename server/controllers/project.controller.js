@@ -3,7 +3,8 @@ import projectService from '../services/project.service.js';
 export const getProjects = async (req, res, next) => {
   try {
     const { search, status, priority, page, limit } = req.query;
-    const result = await projectService.getAll({ search, status, priority, page, limit });
+    const employeeId = req.user.role === 'Admin' ? null : req.user._id;
+    const result = await projectService.getAll({ search, status, priority, page, limit, employeeId });
     res.status(200).json({ success: true, ...result });
   } catch (error) {
     next(error);

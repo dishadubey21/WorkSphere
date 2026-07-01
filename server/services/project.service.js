@@ -1,9 +1,10 @@
 import Project from '../models/Project.js';
 import Task from '../models/Task.js';
+import Team from '../models/Team.js';
 import { logActivity } from '../utils/activityLogger.js';
 
 class ProjectService {
-  async getAll({ search, status, priority, page = 1, limit = 8 }) {
+  async getAll({ search, status, priority, page = 1, limit = 8, employeeId }) {
     const query = {};
 
     if (search) {
@@ -16,6 +17,22 @@ class ProjectService {
 
     if (priority) {
       query.priority = priority;
+    }
+
+    if (employeeId) {
+      const teams = await Team.find({
+        $or: [
+          { lead: employeeId },
+          { members: employeeId }
+        ]
+      });
+      const teamIds = teams.map(t => t._id);
+
+      query.$or = [
+        { members: employeeId },
+        { team: { $in: teamIds } },
+        { manager: employeeId }
+      ];
     }
 
     const skip = (page - 1) * limit;
@@ -84,6 +101,13 @@ class ProjectService {
     });
     await project.save();
 
+    const notificationService = (await import('./notification.service.js')).default;
+    if (project.members && project.members.length > 0) {
+      for (const memberId of project.members) {
+        await notificationService.notifyProjectAssignment(memberId, project.name);
+      }
+    }
+
     await logActivity({
       action: 'Created',
       entity: 'Project',
@@ -111,6 +135,12 @@ class ProjectService {
       }
     }
 
+    const oldMembers = project.members.map(m => m.toString());
+    const newMembers = data.members ? data.members.map(m => m.toString()) : oldMembers;
+
+    const addedMembers = newMembers.filter(m => !oldMembers.includes(m));
+    const removedMembers = oldMembers.filter(m => !newMembers.includes(m));
+
     Object.assign(project, data);
 
     // Auto-calculate progress based on updated milestones
@@ -122,6 +152,14 @@ class ProjectService {
     }
 
     await project.save();
+
+    const notificationService = (await import('./notification.service.js')).default;
+    for (const memberId of addedMembers) {
+      await notificationService.notifyProjectAssignment(memberId, project.name);
+    }
+    for (const memberId of removedMembers) {
+      await notificationService.notifyProjectRemoval(memberId, project.name);
+    }
 
     await logActivity({
       action: 'Updated',

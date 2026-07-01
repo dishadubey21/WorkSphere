@@ -36,6 +36,9 @@ class DocumentService {
     const doc = new Document(data);
     await doc.save();
 
+    const notificationService = (await import('./notification.service.js')).default;
+    await notificationService.notifyDocumentUploaded(doc.name, doc.category);
+
     await logActivity({
       action: 'Created',
       entity: 'Document',

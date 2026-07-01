@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { useUI } from '../context/UIContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 // Design System
 import Modal from '../design-system/Modal.jsx';
@@ -20,18 +21,17 @@ import { getAnnouncementsApi, createAnnouncementApi, deleteAnnouncementApi, upda
 import { getEmployeesApi } from '../api/employee.api.js';
 
 const AnnouncementForm = ({ announcement, employees = [], onSuccess, onCancel }) => {
+  const { user } = useAuth();
   const { register, handleSubmit, formState: { errors }, reset } = useForm({
     defaultValues: announcement ? {
       title: announcement.title,
       content: announcement.content,
       category: announcement.category,
-      publishedBy: announcement.publishedBy?._id || '',
       isPinned: announcement.isPinned || false
     } : {
       title: '',
       content: '',
       category: 'Company',
-      publishedBy: '',
       isPinned: false
     }
   });
@@ -41,10 +41,17 @@ const AnnouncementForm = ({ announcement, employees = [], onSuccess, onCancel })
 
   const mutation = useMutation({
     mutationFn: (data) => {
+      const payload = {
+        ...data,
+        publishedBy: user?._id,
+        createdBy: user?._id,
+        publisherName: user?.name,
+        publisherEmail: user?.email
+      };
       if (announcement) {
-        return updateAnnouncementApi({ id: announcement._id, ...data });
+        return updateAnnouncementApi({ id: announcement._id, ...payload });
       }
-      return createAnnouncementApi(data);
+      return createAnnouncementApi(payload);
     },
     onSuccess: (data) => {
       showToast(data.message, 'success');
@@ -61,8 +68,6 @@ const AnnouncementForm = ({ announcement, employees = [], onSuccess, onCancel })
   const onSubmit = (data) => {
     mutation.mutate(data);
   };
-
-  const publisherOptions = employees.map(e => ({ value: e._id, label: `${e.name} (${e.designation})` }));
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="d-flex flex-column gap-3">
@@ -83,15 +88,6 @@ const AnnouncementForm = ({ announcement, employees = [], onSuccess, onCancel })
           { value: 'Social', label: 'Social' }
         ]}
         {...register('category')}
-      />
-      <Select
-        label="Publishing Officer"
-        name="publishedBy"
-        placeholder="Select Publisher"
-        required
-        error={errors.publishedBy?.message}
-        options={publisherOptions}
-        {...register('publishedBy', { required: 'Publisher is required' })}
       />
       <div className="mb-3">
         <label htmlFor="content-text" className="form-label font-heading fw-medium text-dark fs-7 mb-1">Content Notice</label>
@@ -127,6 +123,7 @@ const AnnouncementForm = ({ announcement, employees = [], onSuccess, onCancel })
 export const Announcements = () => {
   const queryClient = useQueryClient();
   const { activeModal, openModal, closeModal, showToast } = useUI();
+  const { user } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState('');
   const [search, setSearch] = useState('');
 
@@ -230,24 +227,26 @@ export const Announcements = () => {
                       </span>
                     )}
                   </div>
-                  <div className="d-flex gap-1">
-                    <button
-                      type="button"
-                      onClick={() => openModal('ANNOUNCEMENT_EDIT', item)}
-                      className="btn btn-link text-ws-primary p-1 border-0 bg-transparent rounded-2"
-                      title="Edit Notice"
-                    >
-                      <Icons.Edit size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(item._id)}
-                      className="btn btn-link text-ws-danger p-1 border-0 bg-transparent rounded-2"
-                      title="Delete Notice"
-                    >
-                      <Icons.Trash size={16} />
-                    </button>
-                  </div>
+                  { (user?.role === 'Admin' || item.createdBy?._id === user?._id || item.createdBy === user?._id || item.publishedBy?._id === user?._id || item.publishedBy === user?._id) && (
+                    <div className="d-flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => openModal('ANNOUNCEMENT_EDIT', item)}
+                        className="btn btn-link text-ws-primary p-1 border-0 bg-transparent rounded-2"
+                        title="Edit Notice"
+                      >
+                        <Icons.Edit size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(item._id)}
+                        className="btn btn-link text-ws-danger p-1 border-0 bg-transparent rounded-2"
+                        title="Delete Notice"
+                      >
+                        <Icons.Trash size={16} />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <Typography variant="h3" className="mb-2 text-dark">{item.title}</Typography>
@@ -255,10 +254,10 @@ export const Announcements = () => {
 
                 <div className="d-flex align-items-center justify-content-between pt-3 border-top border-light">
                   <div className="d-flex align-items-center gap-2">
-                    <Avatar src={item.publishedBy?.avatar} name={item.publishedBy?.name} size="xs" />
+                    <Avatar src={item.publishedBy?.avatar} name={item.publisherName || item.publishedBy?.name} size="xs" />
                     <div>
-                      <span className="fw-semibold text-dark fs-8 block">{item.publishedBy?.name || 'Publisher'}</span>
-                      <span className="text-muted fs-9 block">Published</span>
+                      <span className="fw-semibold text-dark fs-8 block">{item.publisherName || item.publishedBy?.name || 'Publisher'}</span>
+                      <span className="text-muted fs-9 block">{item.publishedBy?.designation || item.publishedBy?.role || 'Staff'}</span>
                     </div>
                   </div>
                   <span className="text-muted fs-8">

@@ -7,17 +7,18 @@ import {
   deleteTask,
   addTaskComment
 } from '../controllers/task.controller.js';
+import { authorize } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
 router.route('/')
   .get(getTasks)
-  .post(createTask);
+  .post(authorize('Admin', 'Manager', 'Team Lead'), createTask);
 
 router.route('/:id')
   .get(getTaskById)
   .put(updateTask)
-  .delete(deleteTask);
+  .delete(authorize('Admin'), deleteTask);
 
 router.route('/:id/comments')
   .post(addTaskComment);

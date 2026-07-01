@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { useUI } from '../context/UIContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 // Design System
 import Modal from '../design-system/Modal.jsx';
@@ -22,46 +23,117 @@ import { getEmployeesApi } from '../api/employee.api.js';
 import { getProjectsApi } from '../api/project.api.js';
 
 const DocumentUploadForm = ({ employees = [], projects = [], onSuccess, onCancel }) => {
-  const { register, handleSubmit, formState: { errors }, reset } = useForm({
+  const { user } = useAuth();
+  const { showToast } = useUI();
+  const queryClient = useQueryClient();
+
+  const isAdminOrManager = user?.role === 'Admin' || user?.role === 'Manager';
+
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploading, setUploading] = useState(false);
+
+  const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm({
     defaultValues: {
       name: '',
       category: 'Policy',
-      uploadedBy: '',
+      uploadedBy: user?._id || '',
       project: ''
     }
   });
 
-  const queryClient = useQueryClient();
-  const { showToast } = useUI();
-
   const mutation = useMutation({
     mutationFn: (data) => {
-      // Simulate file upload by picking a random size between 200KB and 5MB
-      const fileSize = Math.floor(Math.random() * 4800000) + 200000;
-      
-      const payload = {
-        ...data,
-        fileSize,
-        fileUrl: `https://worksphere.com/files/${data.name.replace(/\s+/g, '_')}`
-      };
-
-      if (!payload.project) delete payload.project;
-      
-      return createDocumentApi(payload);
+      if (!data.project) delete data.project;
+      return createDocumentApi(data);
     },
     onSuccess: (data) => {
       showToast(data.message, 'success');
       queryClient.invalidateQueries({ queryKey: ['documents'] });
       reset();
+      setSelectedFile(null);
+      setUploading(false);
+      setUploadProgress(0);
       onSuccess();
     },
     onError: (err) => {
       showToast(err.message, 'danger');
+      setUploading(false);
+      setUploadProgress(0);
     }
   });
 
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFile(e.target.files[0]);
+    }
+  };
+
+  const handleFile = (file) => {
+    const allowedExtensions = ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg'];
+    const fileExtension = file.name.split('.').pop().toLowerCase();
+    
+    if (!allowedExtensions.includes(fileExtension)) {
+      showToast('Unsupported file type. Allowed files: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, PNG, JPG, JPEG.', 'danger');
+      return;
+    }
+
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      showToast('File size exceeds the 5MB limit.', 'danger');
+      return;
+    }
+
+    setSelectedFile(file);
+    setValue('name', file.name, { shouldValidate: true });
+  };
+
   const onSubmit = (data) => {
-    mutation.mutate(data);
+    if (!selectedFile) {
+      showToast('Please select or drag a file to upload.', 'danger');
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress(0);
+
+    const interval = setInterval(() => {
+      setUploadProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          return 100;
+        }
+        return prev + 10;
+      });
+    }, 100);
+
+    setTimeout(() => {
+      mutation.mutate({
+        ...data,
+        fileSize: selectedFile.size,
+        fileUrl: `https://worksphere.com/files/${selectedFile.name.replace(/\s+/g, '_')}`
+      });
+    }, 1100);
   };
 
   const employeeOptions = employees.map(e => ({ value: e._id, label: e.name }));
@@ -70,7 +142,7 @@ const DocumentUploadForm = ({ employees = [], projects = [], onSuccess, onCancel
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="d-flex flex-column gap-3">
       <Input
-        label="Document Name (e.g. Handbook.pdf)"
+        label="Document Name"
         name="name"
         required
         error={errors.name?.message}
@@ -87,15 +159,28 @@ const DocumentUploadForm = ({ employees = [], projects = [], onSuccess, onCancel
         ]}
         {...register('category')}
       />
-      <Select
-        label="Uploading Employee"
-        name="uploadedBy"
-        placeholder="Select Employee"
-        required
-        error={errors.uploadedBy?.message}
-        options={employeeOptions}
-        {...register('uploadedBy', { required: 'Uploader is required' })}
-      />
+      
+      {!isAdminOrManager ? (
+        <div className="d-flex align-items-center gap-3 p-3 bg-light rounded-3 border border-light mb-1">
+          <Avatar src={user?.avatar} name={user?.name} size="sm" />
+          <div>
+            <span className="text-muted fs-8 d-block fw-semibold" style={{ letterSpacing: '0.5px' }}>UPLOADING AS</span>
+            <span className="fw-semibold text-dark fs-7 d-block">{user?.name}</span>
+            <span className="text-muted fs-8 d-block">{user?.email}</span>
+          </div>
+        </div>
+      ) : (
+        <Select
+          label="Uploading Employee"
+          name="uploadedBy"
+          placeholder="Select Employee"
+          required
+          error={errors.uploadedBy?.message}
+          options={employeeOptions}
+          {...register('uploadedBy', { required: 'Uploader is required' })}
+        />
+      )}
+
       <Select
         label="Linked Project (Optional)"
         name="project"
@@ -104,14 +189,50 @@ const DocumentUploadForm = ({ employees = [], projects = [], onSuccess, onCancel
         {...register('project')}
       />
       
-      <div className="border border-dashed rounded-3 p-4 text-center bg-light my-2 cursor-pointer">
+      <div 
+        onDragEnter={handleDrag}
+        onDragOver={handleDrag}
+        onDragLeave={handleDrag}
+        onDrop={handleDrop}
+        onClick={() => document.getElementById('file-upload-input').click()}
+        className={`border border-dashed rounded-3 p-4 text-center cursor-pointer transition-all ${dragActive ? 'border-ws-primary bg-ws-primary-light' : 'bg-light border-ws-border'}`}
+      >
+        <input 
+          id="file-upload-input"
+          type="file"
+          className="d-none"
+          onChange={handleFileChange}
+          accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.png,.jpg,.jpeg"
+        />
         <Icons.Upload size={32} className="text-ws-primary mb-2" />
-        <p className="fs-8 text-muted mb-0 fw-medium">Drag files here or click to browse local files (UI Simulator only)</p>
+        <p className="fs-8 text-muted mb-1.5 fw-medium">
+          {selectedFile ? `Selected: ${selectedFile.name}` : 'Drag files here or click to browse local files'}
+        </p>
+        <span className="fs-9 text-slate-400">PDF, Word, Excel, PowerPoint, Images up to 5MB</span>
       </div>
 
+      {uploading && (
+        <div className="mt-2.5">
+          <div className="d-flex justify-content-between align-items-center mb-1">
+            <span className="fs-8 fw-semibold text-ws-primary">Uploading...</span>
+            <span className="fs-8 fw-semibold text-ws-primary">{uploadProgress}%</span>
+          </div>
+          <div className="progress" style={{ height: '6px' }}>
+            <div 
+              className="progress-bar bg-ws-primary progress-bar-striped progress-bar-animated" 
+              role="progressbar" 
+              style={{ width: `${uploadProgress}%` }}
+              aria-valuenow={uploadProgress} 
+              aria-valuemin="0" 
+              aria-valuemax="100"
+            />
+          </div>
+        </div>
+      )}
+
       <div className="d-flex gap-2 justify-content-end mt-4">
-        <Button variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button type="submit" loading={mutation.isPending}>
+        <Button variant="outline" onClick={onCancel} disabled={uploading}>Cancel</Button>
+        <Button type="submit" loading={uploading} disabled={uploading}>
           Upload Document
         </Button>
       </div>
@@ -121,6 +242,7 @@ const DocumentUploadForm = ({ employees = [], projects = [], onSuccess, onCancel
 
 export const Documents = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { activeModal, openModal, closeModal, showToast } = useUI();
   
   const [search, setSearch] = useState('');
@@ -296,14 +418,16 @@ export const Documents = () => {
                   >
                     <Icons.Download size={16} />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(doc._id)}
-                    className="btn btn-link text-ws-danger p-1 border-0 bg-transparent rounded-2"
-                    title="Delete Record"
-                  >
-                    <Icons.Trash size={16} />
-                  </button>
+                  {(user?.role === 'Admin' || doc.uploadedBy?._id === user?._id || doc.uploadedBy === user?._id) && (
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(doc._id)}
+                      className="btn btn-link text-ws-danger p-1 border-0 bg-transparent rounded-2"
+                      title="Delete Record"
+                    >
+                      <Icons.Trash size={16} />
+                    </button>
+                  )}
                 </div>
               </td>
             </tr>

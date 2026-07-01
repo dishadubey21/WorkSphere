@@ -1,13 +1,14 @@
 export const ROLES = {
   ADMIN: 'Admin',
   MANAGER: 'Manager',
+  TEAM_LEAD: 'Team Lead',
   EMPLOYEE: 'Employee'
 };
 
 export const PERMISSIONS = {
   [ROLES.ADMIN]: {
     routes: [
-      '/',
+      '/dashboard',
       '/employees',
       '/departments',
       '/teams',
@@ -32,20 +33,40 @@ export const PERMISSIONS = {
   },
   [ROLES.MANAGER]: {
     routes: [
-      '/',
-      '/employees', // read-only
+      '/dashboard',
+      '/team',
       '/teams',
       '/projects',
       '/tasks',
       '/kanban',
-      '/leaves',
       '/announcements',
       '/documents',
       '/calendar',
-      '/reports',
+      '/leaves',
       '/settings'
     ],
-    actions: ['PROJECT_CREATE', 'TASK_CREATE', 'TEAM_CREATE', 'ANNOUNCEMENT_CREATE'],
+    actions: ['TASK_CREATE', 'SPRINT_CREATE'],
+    settingsTabs: ['profile'],
+    canManageEmployees: false,
+    canManageRoles: false,
+    canManageSystemSettings: false,
+    canDeleteEverything: false,
+    showAnalytics: true
+  },
+  [ROLES.TEAM_LEAD]: {
+    routes: [
+      '/dashboard',
+      '/teams',
+      '/projects',
+      '/tasks',
+      '/kanban',
+      '/announcements',
+      '/documents',
+      '/calendar',
+      '/leaves',
+      '/settings'
+    ],
+    actions: ['TASK_CREATE'],
     settingsTabs: ['profile'],
     canManageEmployees: false,
     canManageRoles: false,
@@ -55,10 +76,12 @@ export const PERMISSIONS = {
   },
   [ROLES.EMPLOYEE]: {
     routes: [
-      '/',
-      '/tasks',
-      '/kanban',
+      '/dashboard',
+      '/my-tasks',
+      '/my-projects',
+      '/apply-leave',
       '/leaves',
+      '/profile',
       '/announcements',
       '/documents',
       '/calendar',
@@ -79,7 +102,7 @@ export const hasRouteAccess = (role, path) => {
   if (!perm) return false;
   
   // Normalize double slashes or trail slash if any
-  const normalizedPath = path === '/' ? '/' : path.replace(/\/$/, '');
+  const normalizedPath = path === '/' ? '/dashboard' : path.replace(/\/$/, '');
   return perm.routes.includes(normalizedPath);
 };
 

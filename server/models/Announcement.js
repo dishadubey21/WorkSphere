@@ -21,6 +21,19 @@ const announcementSchema = new mongoose.Schema({
     ref: 'Employee',
     required: true
   },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Employee',
+    required: true
+  },
+  publisherName: {
+    type: String,
+    required: true
+  },
+  publisherEmail: {
+    type: String,
+    required: true
+  },
   isPinned: {
     type: Boolean,
     default: false

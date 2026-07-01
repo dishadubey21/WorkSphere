@@ -4,15 +4,19 @@ import {
   getEmployeeById,
   createEmployee,
   updateEmployee,
-  deleteEmployee
+  deleteEmployee,
+  resetEmployeePassword
 } from '../controllers/employee.controller.js';
 import { authorize, adminOrSelf, adminOrManagerOrSelf } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
 router.route('/')
-  .get(authorize('Admin', 'Manager'), getEmployees)
+  .get(authorize('Admin', 'Manager', 'Team Lead'), getEmployees)
   .post(authorize('Admin'), createEmployee);
+
+router.route('/:id/reset-password')
+  .post(authorize('Admin'), resetEmployeePassword);
 
 router.route('/:id')
   .get(adminOrManagerOrSelf, getEmployeeById)

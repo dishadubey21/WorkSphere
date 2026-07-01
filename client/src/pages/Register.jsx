@@ -28,45 +28,20 @@ export const Register = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [apiError, setApiError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [departments, setDepartments] = useState([]);
-  
-  // Selected Avatar Preset
-  const [selectedAvatar, setSelectedAvatar] = useState(PRESET_AVATARS[0]);
 
   // Password strength states
   const [passStrength, setPassStrength] = useState({ score: 0, label: 'Weak', color: 'bg-danger' });
 
-  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
+  const { register, handleSubmit, watch, formState: { errors } } = useForm({
     defaultValues: { 
       name: '', 
       email: '', 
-      phone: '', 
-      department: '', 
-      designation: '', 
       password: '', 
-      confirmPassword: '', 
-      role: 'Employee', 
-      avatar: PRESET_AVATARS[0] 
+      confirmPassword: ''
     }
   });
 
   const passwordVal = watch('password');
-  const roleVal = watch('role');
-
-  // Fetch departments for registration dropdown
-  useEffect(() => {
-    const fetchDepts = async () => {
-      try {
-        const res = await apiClient.get('/departments');
-        if (res.success && res.departments) {
-          setDepartments(res.departments);
-        }
-      } catch (err) {
-        console.error('Failed to load departments', err);
-      }
-    };
-    fetchDepts();
-  }, []);
 
   // Calculate password strength
   useEffect(() => {
@@ -98,11 +73,6 @@ export const Register = () => {
     setPassStrength({ score, label, color });
   }, [passwordVal]);
 
-  const selectAvatar = (url) => {
-    setSelectedAvatar(url);
-    setValue('avatar', url);
-  };
-
   const onSubmit = async (data) => {
     setIsLoading(true);
     setApiError('');
@@ -110,12 +80,7 @@ export const Register = () => {
       const payload = {
         name: data.name,
         email: data.email,
-        phone: data.phone,
-        department: data.department,
-        designation: data.designation,
-        password: data.password,
-        role: data.role,
-        avatar: data.avatar
+        password: data.password
       };
       
       await signup(payload);
@@ -165,137 +130,29 @@ export const Register = () => {
 
           <form onSubmit={handleSubmit(onSubmit)} className="d-flex flex-column gap-3.5">
             
-            {/* Premium Profile Image Picker */}
-            <div className="d-flex flex-column">
-              <label className="form-label font-body fs-8 text-muted fw-semibold mb-1.5">Choose Profile Avatar</label>
-              <div className="d-flex align-items-center gap-2.5 p-2 bg-light rounded-3 border">
-                <img 
-                  src={selectedAvatar} 
-                  alt="Selected avatar" 
-                  className="rounded-circle border bg-white" 
-                  style={{ width: '48px', height: '48px', objectFit: 'cover' }}
-                />
-                <div className="d-flex flex-wrap gap-1.5">
-                  {PRESET_AVATARS.map((url, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => selectAvatar(url)}
-                      className={`btn p-0 rounded-circle border-2 bg-white ${selectedAvatar === url ? 'border-ws-primary shadow-sm' : 'border-transparent'}`}
-                      style={{ width: '32px', height: '32px', overflow: 'hidden' }}
-                    >
-                      <img src={url} alt={`Preset ${i}`} className="w-100 h-100" />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="row g-3">
-              <div className="col-12 col-sm-6">
-                <Input
-                  label="Full Name"
-                  name="name"
-                  placeholder="Sarah Jenkins"
-                  required
-                  aria-label="Full Name"
-                  error={errors.name?.message}
-                  {...register('name', { required: 'Full name is required' })}
-                />
-              </div>
-              <div className="col-12 col-sm-6">
-                <Input
-                  label="Email Address"
-                  name="email"
-                  type="email"
-                  placeholder="sarah.jenkins@worksphere.com"
-                  required
-                  aria-label="Email Address"
-                  error={errors.email?.message}
-                  {...register('email', {
-                    required: 'Email is required',
-                    pattern: { value: /^\S+@\S+$/i, message: 'Invalid email format' }
-                  })}
-                />
-              </div>
-            </div>
-
-            <div className="row g-3">
-              <div className="col-12 col-sm-6">
-                <Input
-                  label="Phone Number"
-                  name="phone"
-                  placeholder="+1 (555) 019-2834"
-                  required
-                  aria-label="Phone Number"
-                  error={errors.phone?.message}
-                  {...register('phone', { required: 'Phone number is required' })}
-                />
-              </div>
-              <div className="col-12 col-sm-6">
-                <div className="d-flex flex-column">
-                  <label className="form-label font-body fs-7 text-dark fw-medium mb-1.5">Department</label>
-                  <select
-                    className={`form-select bg-light border-0 py-2 fs-7 ${errors.department ? 'is-invalid' : ''}`}
-                    style={{ borderRadius: '8px', height: '39px' }}
-                    aria-label="Select Department"
-                    {...register('department', { required: 'Department is required' })}
-                  >
-                    <option value="">Select Department...</option>
-                    {departments.map(d => (
-                      <option key={d._id} value={d._id}>{d.name}</option>
-                    ))}
-                  </select>
-                  {errors.department && <span className="text-danger fs-8 mt-1">{errors.department.message}</span>}
-                </div>
-              </div>
-            </div>
-
             <Input
-              label="Designation / Role Title"
-              name="designation"
-              placeholder="Senior PM / Software Engineer"
+              label="Full Name"
+              name="name"
+              placeholder="Disha Dubey"
               required
-              aria-label="Designation or Role Title"
-              error={errors.designation?.message}
-              {...register('designation', { required: 'Designation is required' })}
+              aria-label="Full Name"
+              error={errors.name?.message}
+              {...register('name', { required: 'Full name is required' })}
             />
 
-            {/* Premium Radio Selection for Roles */}
-            <div className="d-flex flex-column">
-              <label className="form-label font-body fs-8 text-muted fw-semibold mb-2">Select Your Role</label>
-              <div className="row g-2">
-                {[
-                  { value: 'Employee', label: 'Employee', desc: 'Personal tasks/leaves' },
-                  { value: 'Manager', label: 'Manager', desc: 'Team dashboard & logs' },
-                  { value: 'Admin', label: 'Admin', desc: 'System management access' }
-                ].map(role => (
-                  <div key={role.value} className="col-4">
-                    <label 
-                      className={`w-100 p-2.5 border rounded-3 cursor-pointer d-flex flex-column gap-1 transition-all h-100 ${roleVal === role.value ? 'border-ws-primary bg-ws-primary-light text-dark shadow-sm' : 'border-light hover-border-slate-300'}`}
-                      style={{ borderStyle: 'solid', borderWidth: '1.5px' }}
-                    >
-                      <input
-                        type="radio"
-                        value={role.value}
-                        className="form-check-input d-none"
-                        {...register('role')}
-                      />
-                      <div className="d-flex align-items-center justify-content-between mb-0.5">
-                        <span className="fw-bold fs-8">{role.label}</span>
-                        <div 
-                          className="rounded-circle border border-slate-300 d-flex align-items-center justify-content-center"
-                          style={{ width: '14px', height: '14px', borderColor: roleVal === role.value ? 'var(--ws-primary)' : '' }}
-                        >
-                          {roleVal === role.value && <div className="rounded-circle bg-ws-primary" style={{ width: '6px', height: '6px' }} />}
-                        </div>
-                      </div>
-                      <span className="text-muted fs-9 leading-normal d-none d-sm-block">{role.desc}</span>
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <Input
+              label="Email Address"
+              name="email"
+              type="email"
+              placeholder="disha.dubey@worksphere.com"
+              required
+              aria-label="Email Address"
+              error={errors.email?.message}
+              {...register('email', {
+                required: 'Email is required',
+                pattern: { value: /^\S+@\S+$/i, message: 'Invalid email format' }
+              })}
+            />
 
             {/* Passwords Input Fields */}
             <div className="row g-3">
@@ -378,7 +235,7 @@ export const Register = () => {
               Create Account
             </Button>
           </form>
-
+          
           <div className="text-center mt-4 border-top border-light pt-3">
             <span className="fs-8 text-muted">Already have an account? </span>
             <Link to="/login" className="fs-8 text-ws-primary text-decoration-none fw-bold hover-underline">

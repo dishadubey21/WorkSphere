@@ -3,8 +3,8 @@ import Department from '../models/Department.js';
 import { logActivity } from '../utils/activityLogger.js';
 
 class EmployeeService {
-  async getAll({ search, department, designation, sort, page = 1, limit = 10 }) {
-    const query = {};
+  async getAll({ search, department, designation, sort, page = 1, limit = 10, filter = {} }) {
+    const query = { ...filter };
 
     if (search) {
       query.$or = [
@@ -103,15 +103,49 @@ class EmployeeService {
       }
     }
 
+    const roleChanged = data.role && data.role !== employee.role;
+    const oldRole = employee.role;
+    const newRole = data.role;
+
+    const statusChanged = data.status && data.status !== employee.status;
+    const oldStatus = employee.status;
+    const newStatus = data.status;
+
     Object.assign(employee, data);
     await employee.save();
 
-    await logActivity({
-      action: 'Updated',
-      entity: 'Employee',
-      entityId: employee._id,
-      description: `Updated employee details for: ${employee.name}`
-    });
+    // Trigger decoupled notifications & logs
+    const notificationService = (await import('./notification.service.js')).default;
+
+    if (roleChanged) {
+      await notificationService.notifyRoleChange(employee._id, newRole);
+      await logActivity({
+        action: 'Updated',
+        entity: 'Employee',
+        entityId: employee._id,
+        description: `Admin changed role of ${employee.name}: ${oldRole} → ${newRole}`
+      });
+    }
+
+    if (statusChanged) {
+      await notificationService.notifyStatusChange(employee._id, newStatus);
+      const actionLabel = newStatus === 'Suspended' ? 'Suspend' : newStatus === 'Active' ? 'Activate' : 'Updated Status';
+      await logActivity({
+        action: 'Updated',
+        entity: 'Employee',
+        entityId: employee._id,
+        description: `Admin updated account status of ${employee.name} to ${newStatus}`
+      });
+    }
+
+    if (!roleChanged && !statusChanged) {
+      await logActivity({
+        action: 'Updated',
+        entity: 'Employee',
+        entityId: employee._id,
+        description: `Updated employee details for: ${employee.name}`
+      });
+    }
 
     return employee;
   }
@@ -134,6 +168,31 @@ class EmployeeService {
     });
 
     return employee;
+  }
+
+  async resetPassword(id) {
+    const employee = await Employee.findById(id);
+    if (!employee) {
+      const error = new Error('Employee not found');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const tempPassword = 'WS-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    employee.password = tempPassword;
+    await employee.save();
+
+    const notificationService = (await import('./notification.service.js')).default;
+    await notificationService.notifyPasswordReset(employee._id);
+
+    await logActivity({
+      action: 'Updated',
+      entity: 'Employee',
+      entityId: employee._id,
+      description: `Admin reset password for employee: ${employee.name}`
+    });
+
+    return tempPassword;
   }
 }
 

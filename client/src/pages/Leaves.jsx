@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { useUI } from '../context/UIContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 // Design System
 import Modal from '../design-system/Modal.jsx';
@@ -21,9 +22,12 @@ import { getLeavesApi, createLeaveApi, updateLeaveStatusApi, getLeaveSummaryApi 
 import { getEmployeesApi } from '../api/employee.api.js';
 
 const LeaveForm = ({ employees = [], onSuccess, onCancel }) => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
+
   const { register, handleSubmit, formState: { errors }, reset } = useForm({
     defaultValues: {
-      employee: '',
+      employee: isAdmin ? '' : user?._id,
       type: 'Annual',
       startDate: new Date().toISOString().split('T')[0],
       endDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 2 days out
@@ -58,15 +62,25 @@ const LeaveForm = ({ employees = [], onSuccess, onCancel }) => {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="d-flex flex-column gap-3">
-      <Select
-        label="Applying Employee"
-        name="employee"
-        placeholder="Select Employee"
-        required
-        error={errors.employee?.message}
-        options={employeeOptions}
-        {...register('employee', { required: 'Employee is required' })}
-      />
+      {isAdmin ? (
+        <Select
+          label="Applying Employee"
+          name="employee"
+          placeholder="Select Employee"
+          required
+          error={errors.employee?.message}
+          options={employeeOptions}
+          {...register('employee', { required: 'Employee is required' })}
+        />
+      ) : (
+        <div className="d-flex align-items-center gap-3 p-3 bg-light rounded-3 border border-light mb-1">
+          <Avatar src={user?.avatar} name={user?.name} size="sm" />
+          <div>
+            <span className="fw-semibold text-dark fs-7 d-block">{user?.name}</span>
+            <span className="text-muted fs-8 d-block">Applying as Employee (Self)</span>
+          </div>
+        </div>
+      )}
       <Select
         label="Leave Type"
         name="type"
@@ -120,30 +134,37 @@ const LeaveForm = ({ employees = [], onSuccess, onCancel }) => {
 
 export const Leaves = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { activeModal, openModal, closeModal, showToast } = useUI();
   const [activeEmployeeFilter, setActiveEmployeeFilter] = useState('');
 
+  const isAdmin = user?.role === 'Admin';
+  // If not Admin, they only view their own leaves
+  const targetEmployeeId = isAdmin ? activeEmployeeFilter : user?._id;
+
   // 1. Fetch Leaves list
   const { data: leavesData, isLoading: leavesLoading } = useQuery({
-    queryKey: ['leaves', { employee: activeEmployeeFilter }],
-    queryFn: () => getLeavesApi({ employee: activeEmployeeFilter })
+    queryKey: ['leaves', { employee: targetEmployeeId }],
+    queryFn: () => getLeavesApi({ employee: targetEmployeeId })
   });
 
   // 2. Fetch Employees (for dropdown form & filter)
   const { data: empData } = useQuery({
     queryKey: ['employees-list-all'],
-    queryFn: () => getEmployeesApi({ limit: 1000 })
+    queryFn: () => getEmployeesApi({ limit: 1000 }),
+    enabled: isAdmin // Only fetch employee list for admins
   });
 
   // 3. Fetch Leave Summary
   const { data: summaryData, isLoading: summaryLoading } = useQuery({
-    queryKey: ['leave-summary', activeEmployeeFilter],
-    queryFn: () => getLeaveSummaryApi(activeEmployeeFilter)
+    queryKey: ['leave-summary', targetEmployeeId],
+    queryFn: () => getLeaveSummaryApi(targetEmployeeId),
+    enabled: !!targetEmployeeId
   });
 
   // 4. Update Status Mutation (Approved / Rejected)
   const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }) => updateLeaveStatusApi({ id, status, approvedBy: '660f1b2c4f828a2a4cc1b234' }), // mock admin
+    mutationFn: ({ id, status }) => updateLeaveStatusApi({ id, status, approvedBy: user?._id }),
     onSuccess: (data) => {
       showToast(data.message, 'success');
       queryClient.invalidateQueries({ queryKey: ['leaves'] });
@@ -189,20 +210,24 @@ export const Leaves = () => {
   const filterElements = (
     <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
       <div className="d-flex align-items-center gap-2 flex-grow-1" style={{ maxWidth: '350px' }}>
-        <select
-          value={activeEmployeeFilter}
-          onChange={(e) => setActiveEmployeeFilter(e.target.value)}
-          className="form-select rounded-3 border-ws-border fs-7 py-2"
-        >
-          <option value="">Show All Employees Summary</option>
-          {employees.map(e => (
-            <option key={e._id} value={e._id}>{e.name} ({e.designation})</option>
-          ))}
-        </select>
+        {isAdmin && (
+          <select
+            value={activeEmployeeFilter}
+            onChange={(e) => setActiveEmployeeFilter(e.target.value)}
+            className="form-select rounded-3 border-ws-border fs-7 py-2"
+          >
+            <option value="">Show All Employees Summary</option>
+            {employees.map(e => (
+              <option key={e._id} value={e._id}>{e.name} ({e.designation})</option>
+            ))}
+          </select>
+        )}
       </div>
-      <Button onClick={() => openModal('LEAVE_APPLY')} icon={<Icons.Plus size={16} />}>
-        Apply Leave
-      </Button>
+      {!isAdmin && (
+        <Button onClick={() => openModal('LEAVE_APPLY')} icon={<Icons.Plus size={16} />}>
+          Apply Leave
+        </Button>
+      )}
     </div>
   );
 
@@ -222,28 +247,28 @@ export const Leaves = () => {
             <div className="col-12 col-md-3">
               <Card className="border border-light">
                 <Typography variant="body2" className="text-muted fw-semibold">Annual Vacation</Typography>
-                <h3 className="fw-bold fs-2 text-ws-primary mt-2 mb-1">{summary.remaining.Annual} Days</h3>
-                <span className="text-muted fs-8">Remaining from {summary.allocations.Annual} days</span>
+                <h3 className="fw-bold fs-2 text-ws-primary mt-2 mb-1">{summary.remaining?.Annual || 0} Days</h3>
+                <span className="text-muted fs-8">Remaining from {summary.allocations?.Annual || 0} days</span>
               </Card>
             </div>
             <div className="col-12 col-md-3">
               <Card className="border border-light">
                 <Typography variant="body2" className="text-muted fw-semibold">Sick Leave</Typography>
-                <h3 className="fw-bold fs-2 text-ws-secondary mt-2 mb-1">{summary.remaining.Sick} Days</h3>
-                <span className="text-muted fs-8">Remaining from {summary.allocations.Sick} days</span>
+                <h3 className="fw-bold fs-2 text-ws-secondary mt-2 mb-1">{summary.remaining?.Sick || 0} Days</h3>
+                <span className="text-muted fs-8">Remaining from {summary.allocations?.Sick || 0} days</span>
               </Card>
             </div>
             <div className="col-12 col-md-3">
               <Card className="border border-light">
                 <Typography variant="body2" className="text-muted fw-semibold">Maternity/Paternity</Typography>
-                <h3 className="fw-bold fs-2 text-ws-accent-dark mt-2 mb-1">{summary.remaining['Maternity/Paternity']} Days</h3>
-                <span className="text-muted fs-8">Remaining from {summary.allocations['Maternity/Paternity']} days</span>
+                <h3 className="fw-bold fs-2 text-ws-accent-dark mt-2 mb-1">{summary.remaining?.['Maternity/Paternity'] || 0} Days</h3>
+                <span className="text-muted fs-8">Remaining from {summary.allocations?.['Maternity/Paternity'] || 0} days</span>
               </Card>
             </div>
             <div className="col-12 col-md-3">
               <Card className="border border-light">
                 <Typography variant="body2" className="text-muted fw-semibold">Unpaid Taken</Typography>
-                <h3 className="fw-bold fs-2 text-muted mt-2 mb-1">{summary.taken.Unpaid} Days</h3>
+                <h3 className="fw-bold fs-2 text-muted mt-2 mb-1">{summary.taken?.Unpaid || 0} Days</h3>
                 <span className="text-muted fs-8">Accumulated total time off</span>
               </Card>
             </div>
@@ -287,24 +312,28 @@ export const Leaves = () => {
               </td>
               <td>
                 {leave.status === 'Pending' ? (
-                  <div className="d-flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="success"
-                      onClick={() => updateStatusMutation.mutate({ id: leave._id, status: 'Approved' })}
-                      disabled={updateStatusMutation.isPending}
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      onClick={() => updateStatusMutation.mutate({ id: leave._id, status: 'Rejected' })}
-                      disabled={updateStatusMutation.isPending}
-                    >
-                      Reject
-                    </Button>
-                  </div>
+                  isAdmin ? (
+                    <div className="d-flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="success"
+                        onClick={() => updateStatusMutation.mutate({ id: leave._id, status: 'Approved' })}
+                        disabled={updateStatusMutation.isPending}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => updateStatusMutation.mutate({ id: leave._id, status: 'Rejected' })}
+                        disabled={updateStatusMutation.isPending}
+                      >
+                        Reject
+                      </Button>
+                    </div>
+                  ) : (
+                    <span className="text-warning fs-8 fw-semibold">Pending Review</span>
+                  )
                 ) : (
                   <span className="text-muted fs-8">Finalized</span>
                 )}

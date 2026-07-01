@@ -16,7 +16,6 @@ const employeeSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    required: true,
     trim: true
   },
   department: {
@@ -25,8 +24,8 @@ const employeeSchema = new mongoose.Schema({
   },
   designation: {
     type: String,
-    required: true,
-    trim: true
+    trim: true,
+    default: 'Employee'
   },
   manager: {
     type: mongoose.Schema.Types.ObjectId,
@@ -51,16 +50,40 @@ const employeeSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['Admin', 'Manager', 'Employee'],
+    enum: ['Admin', 'Manager', 'Team Lead', 'Employee'],
     default: 'Employee'
   },
   status: {
     type: String,
-    enum: ['Active', 'Inactive'],
+    enum: ['Active', 'Inactive', 'Suspended', 'Resigned', 'On Notice', 'Archived'],
     default: 'Active'
   },
+  emergencyContact: {
+    type: String,
+    trim: true
+  },
+  bio: {
+    type: String,
+    trim: true
+  },
   resetPasswordToken: String,
-  resetPasswordExpire: Date
+  resetPasswordExpire: Date,
+  theme: {
+    type: String,
+    default: 'light'
+  },
+  emailNotifications: {
+    type: Boolean,
+    default: true
+  },
+  pushNotifications: {
+    type: Boolean,
+    default: true
+  },
+  smsAlerts: {
+    type: Boolean,
+    default: false
+  }
 }, { timestamps: true });
 
 // Pre-save hook to hash password before saving to DB

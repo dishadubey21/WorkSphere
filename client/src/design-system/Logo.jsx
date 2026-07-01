@@ -20,8 +20,8 @@ export const Logo = ({
     >
       <defs>
         <linearGradient id="ws-logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#0EAF9B" />
-          <stop offset="100%" stop-color="#0EA5E9" />
+          <stop offset="0%" stopColor="#0EAF9B" />
+          <stop offset="100%" stopColor="#0EA5E9" />
         </linearGradient>
       </defs>
       <polygon points="50,5 90,28 90,72 50,95 10,72 10,28" fill="url(#ws-logo-grad)" />

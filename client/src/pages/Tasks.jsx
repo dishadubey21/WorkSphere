@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { useUI } from '../context/UIContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 // Design System
 import Drawer from '../design-system/Drawer.jsx';
@@ -20,6 +21,9 @@ import { getProjectsApi } from '../api/project.api.js';
 
 // Task Form inside Tasks.jsx
 export const TaskForm = ({ task, employees = [], projects = [], onSuccess, onCancel }) => {
+  const { user } = useAuth();
+  const isEmployee = user?.role === 'Employee';
+
   const { register, handleSubmit, formState: { errors }, reset } = useForm({
     defaultValues: task ? {
       title: task.title,
@@ -84,12 +88,14 @@ export const TaskForm = ({ task, employees = [], projects = [], onSuccess, onCan
         label="Task Title"
         name="title"
         required
+        disabled={isEmployee}
         error={errors.title?.message}
         {...register('title', { required: 'Task Title is required' })}
       />
       <Input
         label="Description"
         name="description"
+        disabled={isEmployee}
         error={errors.description?.message}
         {...register('description')}
       />
@@ -98,6 +104,7 @@ export const TaskForm = ({ task, employees = [], projects = [], onSuccess, onCan
           <Select
             label="Priority"
             name="priority"
+            disabled={isEmployee}
             options={[
               { value: 'Low', label: 'Low' },
               { value: 'Medium', label: 'Medium' },
@@ -128,6 +135,7 @@ export const TaskForm = ({ task, employees = [], projects = [], onSuccess, onCan
             name="project"
             placeholder="Select Project"
             required
+            disabled={isEmployee}
             error={errors.project?.message}
             options={projectOptions}
             {...register('project', { required: 'Project is required' })}
@@ -139,6 +147,7 @@ export const TaskForm = ({ task, employees = [], projects = [], onSuccess, onCan
             name="assignee"
             placeholder="Select Assignee"
             required
+            disabled={isEmployee}
             error={errors.assignee?.message}
             options={assigneeOptions}
             {...register('assignee', { required: 'Assignee is required' })}
@@ -150,6 +159,7 @@ export const TaskForm = ({ task, employees = [], projects = [], onSuccess, onCan
         name="dueDate"
         type="date"
         required
+        disabled={isEmployee}
         error={errors.dueDate?.message}
         {...register('dueDate', { required: 'Due date is required' })}
       />
@@ -157,6 +167,7 @@ export const TaskForm = ({ task, employees = [], projects = [], onSuccess, onCan
         label="Labels (comma separated)"
         name="labels"
         placeholder="Design, Auth, Bug"
+        disabled={isEmployee}
         error={errors.labels?.message}
         {...register('labels')}
       />
@@ -164,7 +175,7 @@ export const TaskForm = ({ task, employees = [], projects = [], onSuccess, onCan
       <div className="d-flex gap-2 justify-content-end mt-4">
         <Button variant="outline" onClick={onCancel}>Cancel</Button>
         <Button type="submit" loading={mutation.isPending}>
-          {task ? 'Save Changes' : 'Create Task'}
+          {isEmployee ? 'Update Status' : (task ? 'Save Changes' : 'Create Task')}
         </Button>
       </div>
     </form>
@@ -173,7 +184,11 @@ export const TaskForm = ({ task, employees = [], projects = [], onSuccess, onCan
 
 export const Tasks = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { activeDrawer, openDrawer, closeDrawer, showToast } = useUI();
+
+  const isEmployee = user?.role === 'Employee';
+  const targetAssigneeId = isEmployee ? user?._id : '';
 
   // Search & Filter State
   const [search, setSearch] = useState('');
@@ -184,8 +199,8 @@ export const Tasks = () => {
 
   // 1. Fetch Tasks
   const { data, isLoading } = useQuery({
-    queryKey: ['tasks', { search, priority, status, project, page }],
-    queryFn: () => getTasksApi({ search, priority, status, project, page, limit: 10 }),
+    queryKey: ['tasks', { search, priority, status, project, page, assignee: targetAssigneeId }],
+    queryFn: () => getTasksApi({ search, priority, status, project, page, limit: 10, assignee: targetAssigneeId }),
     keepPreviousData: true
   });
 
@@ -299,9 +314,11 @@ export const Tasks = () => {
           <option value="High">High</option>
           <option value="Urgent">Urgent</option>
         </select>
-        <Button onClick={() => openDrawer('TASK_CREATE')} icon={<Icons.Plus size={16} />}>
-          Add Task
-        </Button>
+        {!isEmployee && (
+          <Button onClick={() => openDrawer('TASK_CREATE')} icon={<Icons.Plus size={16} />}>
+            Add Task
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -311,8 +328,10 @@ export const Tasks = () => {
       <div className="d-flex flex-column gap-4 animate-fadeIn">
         <div className="d-flex align-items-center justify-content-between border-bottom pb-3">
           <div>
-            <Typography variant="h2">Tasks Dashboard</Typography>
-            <Typography variant="body1">Create, assign, filter, and track granular work items.</Typography>
+            <Typography variant="h2">{isEmployee ? 'My Tasks' : 'Tasks Dashboard'}</Typography>
+            <Typography variant="body1">
+              {isEmployee ? 'View and update progress of your assigned deliverables.' : 'Create, assign, filter, and track granular work items.'}
+            </Typography>
           </div>
         </div>
 
@@ -322,9 +341,9 @@ export const Tasks = () => {
           isEmpty={tasks.length === 0}
           emptyIllustration="tasks"
           emptyTitle="No Tasks Scheduled"
-          emptyDescription="Start assigning deliverables by scheduling a new task."
-          emptyActionLabel="Add Task"
-          onEmptyAction={() => openDrawer('TASK_CREATE')}
+          emptyDescription={isEmployee ? "You do not have any tasks assigned currently." : "Start assigning deliverables by scheduling a new task."}
+          emptyActionLabel={!isEmployee ? "Add Task" : ""}
+          onEmptyAction={!isEmployee ? () => openDrawer('TASK_CREATE') : undefined}
           pagination={pagination}
           onPageChange={setPage}
           filters={filterElements}
@@ -363,18 +382,20 @@ export const Tasks = () => {
                     type="button"
                     onClick={() => openDrawer('TASK_EDIT', task)}
                     className="btn btn-link text-ws-primary p-1 border-0 bg-transparent rounded-2"
-                    title="Edit Task"
+                    title={isEmployee ? "Update Status" : "Edit Task"}
                   >
                     <Icons.Edit size={16} />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(task._id)}
-                    className="btn btn-link text-ws-danger p-1 border-0 bg-transparent rounded-2"
-                    title="Delete Task"
-                  >
-                    <Icons.Trash size={16} />
-                  </button>
+                  {!isEmployee && (
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(task._id)}
+                      className="btn btn-link text-ws-danger p-1 border-0 bg-transparent rounded-2"
+                      title="Delete Task"
+                    >
+                      <Icons.Trash size={16} />
+                    </button>
+                  )}
                 </div>
               </td>
             </tr>

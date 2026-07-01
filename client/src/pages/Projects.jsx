@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { useUI } from '../context/UIContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 // Design System
 import Drawer from '../design-system/Drawer.jsx';
@@ -231,7 +232,10 @@ const ProjectForm = ({ project, employees = [], onSuccess, onCancel }) => {
 
 export const Projects = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { activeDrawer, openDrawer, closeDrawer, showToast } = useUI();
+
+  const canManageProjects = user?.role === 'Admin' || user?.role === 'Manager';
 
   // Search & Filter State
   const [search, setSearch] = useState('');
@@ -335,9 +339,11 @@ export const Projects = () => {
           <option value="Medium">Medium</option>
           <option value="High">High</option>
         </select>
-        <Button onClick={() => openDrawer('PROJECT_CREATE')} icon={<Icons.Plus size={16} />}>
-          Add Project
-        </Button>
+        {canManageProjects && (
+          <Button onClick={() => openDrawer('PROJECT_CREATE')} icon={<Icons.Plus size={16} />}>
+            Add Project
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -352,12 +358,14 @@ export const Projects = () => {
         emptyIllustration="projects"
         emptyTitle="No Projects Found"
         emptyDescription="Get started by sketching your first project roadmap timeline."
-        emptyActionLabel="Add Project"
-        onEmptyAction={() => openDrawer('PROJECT_CREATE')}
+        emptyActionLabel={canManageProjects ? "Add Project" : ""}
+        onEmptyAction={canManageProjects ? () => openDrawer('PROJECT_CREATE') : undefined}
         actions={
-          <Button onClick={() => openDrawer('PROJECT_CREATE')} icon={<Icons.Plus size={16} />}>
-            Add Project
-          </Button>
+          canManageProjects ? (
+            <Button onClick={() => openDrawer('PROJECT_CREATE')} icon={<Icons.Plus size={16} />}>
+              Add Project
+            </Button>
+          ) : null
         }
       >
         {/* Filters */}
@@ -373,24 +381,26 @@ export const Projects = () => {
                       <Badge variant={statusBadgeColor(p.status)}>{p.status}</Badge>
                       <Badge variant={priorityBadgeColor(p.priority)}>{p.priority} Priority</Badge>
                     </div>
-                    <div className="d-flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => openDrawer('PROJECT_EDIT', p)}
-                        className="btn btn-link text-ws-primary p-1 border-0 bg-transparent rounded-2"
-                        title="Edit Project"
-                      >
-                        <Icons.Edit size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(p._id)}
-                        className="btn btn-link text-ws-danger p-1 border-0 bg-transparent rounded-2"
-                        title="Delete Project"
-                      >
-                        <Icons.Trash size={16} />
-                      </button>
-                    </div>
+                    {canManageProjects && (
+                      <div className="d-flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => openDrawer('PROJECT_EDIT', p)}
+                          className="btn btn-link text-ws-primary p-1 border-0 bg-transparent rounded-2"
+                          title="Edit Project"
+                        >
+                          <Icons.Edit size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(p._id)}
+                          className="btn btn-link text-ws-danger p-1 border-0 bg-transparent rounded-2"
+                          title="Delete Project"
+                        >
+                          <Icons.Trash size={16} />
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <Typography variant="h3" className="mb-2 text-dark">{p.name}</Typography>

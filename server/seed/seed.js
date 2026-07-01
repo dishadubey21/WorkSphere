@@ -18,16 +18,47 @@ dotenv.config();
 
 const seedData = async () => {
   try {
-    // Check if database already has employees to prevent duplicates
-    const count = await Employee.countDocuments();
-    if (count > 0) {
-      console.log('Database already populated. Skipping seeding to prevent duplicate data.');
-      process.exit(0);
+    // Keep existing admin if any
+    let admin = await Employee.findOne({ role: 'Admin' });
+    if (!admin) {
+      admin = new Employee({
+        name: 'System Admin',
+        email: 'admin@worksphere.com',
+        phone: '+1 (555) 019-0000',
+        designation: 'System Administrator',
+        joiningDate: new Date(),
+        address: 'WorkSphere Headquarters',
+        password: 'Admin@123',
+        role: 'Admin',
+        status: 'Active'
+      });
+      await admin.save();
+      console.log('Seeded new System Admin.');
+    } else {
+      console.log('Admin account already exists. Preserving existing Admin.');
     }
 
-    // 1. Clear Existing Data
-    await mongoose.connection.dropDatabase();
-    console.log('Database wiped successfully.');
+    // Clear all other data to prepare for seed
+    const mockEmails = [
+      'sarah.jenkins@worksphere.com', 'david.chen@worksphere.com', 'elena.rostova@worksphere.com',
+      'marcus.sterling@worksphere.com', 'aisha.rahman@worksphere.com', 'alex.mercer@worksphere.com',
+      'chloe.fraser@worksphere.com', 'ethan.hunt@worksphere.com', 'devon.lane@worksphere.com',
+      'zoe.washburne@worksphere.com', 'bessie.cooper@worksphere.com', 'cody.fisher@worksphere.com',
+      'dianne.russell@worksphere.com', 'esther.howard@worksphere.com', 'guy.hawkins@worksphere.com',
+      'jenny.wilson@worksphere.com', 'kristin.watson@worksphere.com', 'albert.flores@worksphere.com',
+      'floyd.miles@worksphere.com', 'courtney.henry@worksphere.com'
+    ];
+    await Employee.deleteMany({ $or: [{ role: { $ne: 'Admin' } }, { email: { $in: mockEmails } }] });
+    await Department.deleteMany({});
+    await Team.deleteMany({});
+    await Project.deleteMany({});
+    await Task.deleteMany({});
+    await Leave.deleteMany({});
+    await Announcement.deleteMany({});
+    await Document.deleteMany({});
+    await Notification.deleteMany({});
+    await ActivityLog.deleteMany({});
+    console.log('Cleaned non-admin database records.');
 
     // 2. Generate Departments (5)
     const departmentsData = [
@@ -93,19 +124,7 @@ const seedData = async () => {
       const avatarGender = i % 2 === 0 ? 'women' : 'men';
       const avatarId = Math.floor(Math.random() * 50) + 1;
 
-      // Map roles: Leaders are Admin/Manager, others are Employee
       let role = 'Employee';
-      if (raw.name === 'Sarah Jenkins' || raw.name === 'David Chen') {
-        role = 'Admin';
-      } else if (
-        raw.designation.includes('Director') || 
-        raw.designation.includes('VP') || 
-        raw.designation.includes('Head') ||
-        raw.designation.includes('Principal') ||
-        (raw.designation.includes('Manager') && !raw.designation.includes('Senior'))
-      ) {
-        role = 'Manager';
-      }
       
       const employee = new Employee({
         name: raw.name,
@@ -224,6 +243,7 @@ const seedData = async () => {
         startDate: start,
         endDate: end,
         members: projectMembers,
+        createdBy: admin._id,
         milestones: [
           { title: 'Research & Wireframing', dueDate: new Date(start.getTime() + 15 * 24 * 60 * 60 * 1000), completed: p.completionPct >= 20 },
           { title: 'Alpha Architecture Release', dueDate: new Date(start.getTime() + 45 * 24 * 60 * 60 * 1000), completed: p.completionPct >= 50 },

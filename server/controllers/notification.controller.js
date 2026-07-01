@@ -2,7 +2,7 @@ import notificationService from '../services/notification.service.js';
 
 export const getNotifications = async (req, res, next) => {
   try {
-    const { recipient } = req.query;
+    const recipient = req.user.role === 'Admin' ? (req.query.recipient || req.user._id) : req.user._id;
     const notifications = await notificationService.getAll(recipient);
     res.status(200).json({ success: true, notifications });
   } catch (error) {
@@ -21,7 +21,7 @@ export const markRead = async (req, res, next) => {
 
 export const markAllRead = async (req, res, next) => {
   try {
-    const { recipient } = req.body;
+    const recipient = req.user.role === 'Admin' ? (req.body.recipient || req.user._id) : req.user._id;
     await notificationService.markAllAsRead(recipient);
     res.status(200).json({ success: true, message: 'All notifications marked as read' });
   } catch (error) {

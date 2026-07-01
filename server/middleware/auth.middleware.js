@@ -35,6 +35,14 @@ export const protect = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'User record not found' });
     }
     
+    // Check if account status is active
+    if (req.user.status !== 'Active') {
+      return res.status(403).json({
+        success: false,
+        message: `Your account is ${req.user.status}. Access Denied.`
+      });
+    }
+    
     next();
   } catch (err) {
     return res.status(401).json({ success: false, message: 'Session expired or token invalid' });

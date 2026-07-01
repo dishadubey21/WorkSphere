@@ -8,22 +8,23 @@ import {
   addTeamMember,
   removeTeamMember
 } from '../controllers/team.controller.js';
+import { authorize } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
 router.route('/')
   .get(getTeams)
-  .post(createTeam);
+  .post(authorize('Admin'), createTeam);
 
 router.route('/:id')
   .get(getTeamById)
-  .put(updateTeam)
-  .delete(deleteTeam);
+  .put(authorize('Admin'), updateTeam)
+  .delete(authorize('Admin'), deleteTeam);
 
 router.route('/:id/members')
-  .post(addTeamMember);
+  .post(authorize('Admin'), addTeamMember);
 
 router.route('/:id/members/:employeeId')
-  .delete(removeTeamMember);
+  .delete(authorize('Admin'), removeTeamMember);
 
 export default router;

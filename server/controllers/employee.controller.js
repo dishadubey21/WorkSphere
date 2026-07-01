@@ -3,7 +3,18 @@ import employeeService from '../services/employee.service.js';
 export const getEmployees = async (req, res, next) => {
   try {
     const { search, department, designation, sort, page, limit } = req.query;
-    const result = await employeeService.getAll({ search, department, designation, sort, page, limit });
+    
+    let filter = {};
+    if (req.user && (req.user.role === 'Manager' || req.user.role === 'Team Lead')) {
+      const Team = (await import('../models/Team.js')).default;
+      const myTeams = await Team.find({ lead: req.user._id });
+      const memberIds = myTeams.flatMap(t => t.members.map(m => m.toString()));
+      // Always include themselves
+      memberIds.push(req.user._id.toString());
+      filter._id = { $in: memberIds };
+    }
+
+    const result = await employeeService.getAll({ search, department, designation, sort, page, limit, filter });
     res.status(200).json({ success: true, ...result });
   } catch (error) {
     next(error);
@@ -41,6 +52,15 @@ export const deleteEmployee = async (req, res, next) => {
   try {
     const employee = await employeeService.delete(req.params.id);
     res.status(200).json({ success: true, employee, message: 'Employee deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const resetEmployeePassword = async (req, res, next) => {
+  try {
+    const tempPassword = await employeeService.resetPassword(req.params.id);
+    res.status(200).json({ success: true, tempPassword, message: 'Temporary password generated successfully' });
   } catch (error) {
     next(error);
   }

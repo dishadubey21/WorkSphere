@@ -41,7 +41,7 @@ const sendTokenResponse = (user, statusCode, res) => {
 // @access  Public
 export const register = async (req, res, next) => {
   try {
-    const { name, email, phone, department, designation, password, role, avatar } = req.body;
+    const { name, email, password } = req.body;
 
     // Check if employee already exists
     const existing = await Employee.findOne({ email });
@@ -49,16 +49,13 @@ export const register = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Email address already registered' });
     }
 
-    // Create employee
+    // Create employee (enforce defaults for real SaaS safety)
     const user = await Employee.create({
       name,
       email,
-      phone,
-      department,
-      designation,
       password,
-      role: role || 'Employee',
-      avatar: avatar || ''
+      role: 'Employee',
+      status: 'Active'
     });
 
     const populatedUser = await Employee.findById(user._id).populate('department', 'name code');
@@ -81,9 +78,17 @@ export const login = async (req, res, next) => {
     }
 
     // Check for employee (explicitly select password) and populate department
-    const user = await Employee.findOne({ email }).select('+password').populate('department', 'name code');
+    const user = await Employee.findOne({ email }).select('+password +status').populate('department', 'name code');
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+
+    // Enforce active status
+    if (user.status !== 'Active') {
+      return res.status(403).json({
+        success: false,
+        message: `Your account is ${user.status}. Please contact your administrator.`
+      });
     }
 
     // Check if password matches

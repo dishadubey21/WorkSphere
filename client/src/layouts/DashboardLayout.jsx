@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useUI } from '../context/UIContext.jsx';
 import { useSearch } from '../context/SearchContext.jsx';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -18,12 +18,13 @@ import { globalSearchApi } from '../api/search.api.js';
 import { getNotificationsApi, markNotificationReadApi, markAllNotificationsReadApi } from '../api/notification.api.js';
 
 // Constants
-import { SIDEBAR_ITEMS } from '../constants/sidebar.js';
+import { getSidebarItems } from '../constants/sidebar.js';
 import { ROUTES } from '../constants/routes.js';
 import { hasRouteAccess, hasActionAccess } from '../constants/permissions.js';
 
 export const DashboardLayout = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user, logout } = useAuth();
   const {
@@ -118,23 +119,61 @@ export const DashboardLayout = () => {
   // 5. Build breadcrumbs
   const getBreadcrumbs = () => {
     const path = location.pathname;
-    if (path === ROUTES.DASHBOARD) return ['Dashboard'];
 
-    const matched = SIDEBAR_ITEMS.find(item => item.path === path);
-    if (matched) return ['WorkSphere', matched.label];
+    if (path === ROUTES.DASHBOARD) {
+      return ['Dashboard'];
+    }
+
+    const sidebarItems = getSidebarItems(user?.role || 'Employee');
+
+    const matched = sidebarItems.find(item => item.path === path);
+
+    if (matched) {
+      return ['WorkSphere', matched.label];
+    }
 
     return ['WorkSphere', 'Page'];
   };
 
   const breadcrumbs = getBreadcrumbs();
 
+  const getSpeedDialActions = () => {
+    if (!user) return [];
+    if (user.role === 'Admin') {
+      return [
+        { label: 'Create Employee', icon: <Icons.User size={14} className="text-ws-primary" />, action: () => openDrawer('EMPLOYEE_CREATE') },
+        { label: 'Create Project', icon: <Icons.Projects size={14} className="text-ws-secondary" />, action: () => openDrawer('PROJECT_CREATE') },
+        { label: 'Create Team', icon: <Icons.Teams size={14} className="text-ws-success" />, action: () => openModal('TEAM_CREATE') },
+        { label: 'Create Department', icon: <Icons.Departments size={14} className="text-ws-info" />, action: () => openModal('DEPARTMENT_CREATE') },
+        { label: 'Create Announcement', icon: <Icons.Announcements size={14} className="text-ws-danger" />, action: () => openModal('ANNOUNCEMENT_CREATE') },
+        { label: 'Create Task', icon: <Icons.Tasks size={14} className="text-ws-accent" />, action: () => openDrawer('TASK_CREATE') }
+      ];
+    }
+    if (user.role === 'Manager') {
+      return [
+        { label: 'Create Sprint', icon: <Icons.Calendar size={14} className="text-ws-secondary" />, action: () => openModal('SPRINT_CREATE') },
+        { label: 'Create Task', icon: <Icons.Tasks size={14} className="text-ws-accent" />, action: () => openDrawer('TASK_CREATE') },
+        { label: 'Assign Task', icon: <Icons.User size={14} className="text-ws-primary" />, action: () => openDrawer('TASK_CREATE') }
+      ];
+    }
+    if (user.role === 'Team Lead') {
+      return [
+        { label: 'Create Task', icon: <Icons.Tasks size={14} className="text-ws-accent" />, action: () => openDrawer('TASK_CREATE') },
+        { label: 'Assign Task', icon: <Icons.User size={14} className="text-ws-primary" />, action: () => openDrawer('TASK_CREATE') }
+      ];
+    }
+    return [];
+  };
+
+  const dialActions = getSpeedDialActions();
+
   return (
     <div className="d-flex min-vh-100 bg-light">
       {/* Off-canvas sidebar mobile backdrop */}
       {mobileSidebarOpen && (
-        <div 
-          className="sidebar-backdrop d-lg-none" 
-          onClick={() => setMobileSidebarOpen(false)} 
+        <div
+          className="sidebar-backdrop d-lg-none"
+          onClick={() => setMobileSidebarOpen(false)}
         />
       )}
 
@@ -164,7 +203,7 @@ export const DashboardLayout = () => {
 
         <nav className="flex-grow-1 overflow-auto py-3 px-2">
           <ul className="nav flex-column gap-1">
-            {SIDEBAR_ITEMS.filter(item => hasRouteAccess(user?.role || 'Employee', item.path)).map((item) => {
+            {getSidebarItems(user?.role || 'Employee').map((item) => {
               const isActive = location.pathname === item.path;
               const IconComponent = Icons[item.iconKey];
 
@@ -174,8 +213,8 @@ export const DashboardLayout = () => {
                     to={item.path}
                     onClick={() => setMobileSidebarOpen(false)}
                     className={`nav-link rounded-3 py-2.5 px-3 d-flex align-items-center transition-all ${isActive
-                        ? 'bg-ws-primary-light text-ws-primary fw-medium'
-                        : 'text-muted hover-bg-light'
+                      ? 'bg-ws-primary-light text-ws-primary fw-medium'
+                      : 'text-muted hover-bg-light'
                       }`}
                     title={sidebarCollapsed ? item.label : ''}
                   >
@@ -210,12 +249,12 @@ export const DashboardLayout = () => {
       {/* MAIN SCREEN AREA */}
       <div className="flex-grow-1 d-flex flex-column overflow-hidden min-vh-100">
         {/* STICKY TOP NAVBAR */}
-        <header 
+        <header
           className="navbar navbar-expand navbar-light border-bottom border-light px-4 sticky-top py-2.5"
-          style={{ 
-            background: 'rgba(255, 255, 255, 0.75)', 
-            backdropFilter: 'blur(12px)', 
-            WebkitBackdropFilter: 'blur(12px)', 
+          style={{
+            background: 'rgba(255, 255, 255, 0.75)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
             zIndex: 100,
             height: '70px'
           }}
@@ -367,6 +406,22 @@ export const DashboardLayout = () => {
                               key={notif._id}
                               onClick={() => {
                                 if (!notif.isRead) markReadMutation.mutate(notif._id);
+                                setShowNotifications(false);
+
+                                const isEmp = user?.role === 'Employee';
+                                if (notif.category === 'Leave') {
+                                  navigate(ROUTES.LEAVES);
+                                } else if (notif.category === 'Task') {
+                                  navigate(isEmp ? '/my-tasks' : ROUTES.TASKS);
+                                } else if (notif.category === 'Project') {
+                                  navigate(isEmp ? '/my-projects' : ROUTES.PROJECTS);
+                                } else if (notif.category === 'Announcement') {
+                                  if (notif.title.toLowerCase().includes('document')) {
+                                    navigate(ROUTES.DOCUMENTS);
+                                  } else {
+                                    navigate(ROUTES.ANNOUNCEMENTS);
+                                  }
+                                }
                               }}
                               className={`p-2 rounded-2 transition-all cursor-pointer ${notif.isRead ? 'opacity-70 bg-light' : 'bg-ws-primary-light border-start border-3 border-ws-primary'}`}
                             >
@@ -403,8 +458,8 @@ export const DashboardLayout = () => {
                 </button>
 
                 {showProfileMenu && (
-                  <div 
-                    className="position-absolute end-0 mt-2 bg-white rounded-3 shadow-lg border border-light p-2 dropdown-menu-custom animate-scaleUp" 
+                  <div
+                    className="position-absolute end-0 mt-2 bg-white rounded-3 shadow-lg border border-light p-2 dropdown-menu-custom animate-scaleUp"
                     style={{ width: '220px', zIndex: 1030 }}
                   >
                     <div className="px-3 py-2 border-bottom border-light mb-1">
@@ -414,21 +469,21 @@ export const DashboardLayout = () => {
                         {user?.role} • {user?.department?.name || 'No Dept'}
                       </p>
                     </div>
-                    <Link 
-                      to={ROUTES.SETTINGS} 
+                    <Link
+                      to={ROUTES.SETTINGS}
                       className="dropdown-item d-flex align-items-center gap-2 px-3 py-2 rounded-2 fs-7 text-dark text-decoration-none hover-bg-light"
                       onClick={() => setShowProfileMenu(false)}
                     >
                       <Icons.User size={14} className="text-muted" /> My Profile
                     </Link>
-                    <Link 
-                      to={ROUTES.SETTINGS} 
+                    <Link
+                      to={ROUTES.SETTINGS}
                       className="dropdown-item d-flex align-items-center gap-2 px-3 py-2 rounded-2 fs-7 text-dark text-decoration-none hover-bg-light"
                       onClick={() => setShowProfileMenu(false)}
                     >
                       <Icons.Settings size={14} className="text-muted" /> Settings
                     </Link>
-                    <button 
+                    <button
                       type="button"
                       className="dropdown-item w-100 text-start d-flex align-items-center gap-2 px-3 py-2 rounded-2 fs-7 text-dark border-0 bg-transparent hover-bg-light"
                       onClick={() => {
@@ -468,7 +523,7 @@ export const DashboardLayout = () => {
       </div>
 
       {/* FLOATING ACTION SPEED DIAL */}
-      {user && (hasActionAccess(user.role, 'PROJECT_CREATE') || hasActionAccess(user.role, 'EMPLOYEE_CREATE')) && (
+      {dialActions.length > 0 && (
         <div className="speed-dial-container">
           <button
             type="button"
@@ -479,51 +534,16 @@ export const DashboardLayout = () => {
             <Icons.Plus size={24} />
           </button>
           <div className={`speed-dial-menu ${speedDialOpen ? 'open' : ''}`}>
-            {hasActionAccess(user.role, 'EMPLOYEE_CREATE') && (
+            {dialActions.map((act, index) => (
               <button
+                key={index}
                 type="button"
                 className="speed-dial-item btn btn-light rounded-pill px-3 py-1.5 fs-8 fw-semibold border border-light d-flex align-items-center gap-1.5 shadow-sm text-dark hover-bg-light"
-                onClick={() => { openDrawer('EMPLOYEE_CREATE'); setSpeedDialOpen(false); }}
+                onClick={() => { act.action(); setSpeedDialOpen(false); }}
               >
-                <Icons.User size={14} className="text-ws-primary" /> Add Employee
+                {act.icon} {act.label}
               </button>
-            )}
-            {hasActionAccess(user.role, 'PROJECT_CREATE') && (
-              <button
-                type="button"
-                className="speed-dial-item btn btn-light rounded-pill px-3 py-1.5 fs-8 fw-semibold border border-light d-flex align-items-center gap-1.5 shadow-sm text-dark hover-bg-light"
-                onClick={() => { openDrawer('PROJECT_CREATE'); setSpeedDialOpen(false); }}
-              >
-                <Icons.Projects size={14} className="text-ws-secondary" /> Add Project
-              </button>
-            )}
-            {hasActionAccess(user.role, 'TASK_CREATE') && (
-              <button
-                type="button"
-                className="speed-dial-item btn btn-light rounded-pill px-3 py-1.5 fs-8 fw-semibold border border-light d-flex align-items-center gap-1.5 shadow-sm text-dark hover-bg-light"
-                onClick={() => { openDrawer('TASK_CREATE'); setSpeedDialOpen(false); }}
-              >
-                <Icons.Tasks size={14} className="text-ws-accent" /> Add Task
-              </button>
-            )}
-            {hasActionAccess(user.role, 'TEAM_CREATE') && (
-              <button
-                type="button"
-                className="speed-dial-item btn btn-light rounded-pill px-3 py-1.5 fs-8 fw-semibold border border-light d-flex align-items-center gap-1.5 shadow-sm text-dark hover-bg-light"
-                onClick={() => { openModal('TEAM_CREATE'); setSpeedDialOpen(false); }}
-              >
-                <Icons.Teams size={14} className="text-ws-success" /> Create Team
-              </button>
-            )}
-            {hasActionAccess(user.role, 'ANNOUNCEMENT_CREATE') && (
-              <button
-                type="button"
-                className="speed-dial-item btn btn-light rounded-pill px-3 py-1.5 fs-8 fw-semibold border border-light d-flex align-items-center gap-1.5 shadow-sm text-dark hover-bg-light"
-                onClick={() => { openModal('ANNOUNCEMENT_CREATE'); setSpeedDialOpen(false); }}
-              >
-                <Icons.Announcements size={14} className="text-ws-danger" /> Announce
-              </button>
-            )}
+            ))}
           </div>
         </div>
       )}

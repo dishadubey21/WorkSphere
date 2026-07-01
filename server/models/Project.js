@@ -27,6 +27,19 @@ const projectSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Employee',
+    required: true
+  },
+  manager: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Employee'
+  },
+  team: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Team'
+  },
   members: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Employee'

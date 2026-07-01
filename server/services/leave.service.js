@@ -58,6 +58,11 @@ class LeaveService {
 
     const employeeObj = await Employee.findById(data.employee);
 
+    if (employeeObj) {
+      const notificationService = (await import('./notification.service.js')).default;
+      await notificationService.notifyLeaveApplied(employeeObj.name, leave._id);
+    }
+
     await logActivity({
       action: 'Created',
       entity: 'Leave',
@@ -76,15 +81,31 @@ class LeaveService {
       throw error;
     }
 
+    const oldStatus = leave.status;
+    const statusChanged = data.status && data.status !== oldStatus;
+    const newStatus = data.status;
+
     Object.assign(leave, data);
     await leave.save();
 
-    await logActivity({
-      action: 'Updated',
-      entity: 'Leave',
-      entityId: leave._id,
-      description: `${data.status} leave request for ${leave.employee ? leave.employee.name : 'Employee'} (Type: ${leave.type})`
-    });
+    if (statusChanged && (newStatus === 'Approved' || newStatus === 'Rejected')) {
+      const notificationService = (await import('./notification.service.js')).default;
+      await notificationService.notifyLeaveDecided(leave.employee._id, newStatus);
+      
+      await logActivity({
+        action: 'Updated',
+        entity: 'Leave',
+        entityId: leave._id,
+        description: `Admin ${newStatus.toLowerCase()} leave request for ${leave.employee ? leave.employee.name : 'Employee'}`
+      });
+    } else {
+      await logActivity({
+        action: 'Updated',
+        entity: 'Leave',
+        entityId: leave._id,
+        description: `${data.status} leave request for ${leave.employee ? leave.employee.name : 'Employee'} (Type: ${leave.type})`
+      });
+    }
 
     return leave;
   }

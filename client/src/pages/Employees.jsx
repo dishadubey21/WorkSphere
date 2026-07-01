@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { useUI } from '../context/UIContext.jsx';
@@ -13,8 +13,10 @@ import Badge from '../design-system/Badge.jsx';
 import Icons from '../design-system/Icons.jsx';
 import TableLayout from '../layouts/TableLayout.jsx';
 import Typography from '../design-system/Typography.jsx';
+import { Modal } from '../design-system/Modal.jsx';
+
 // APIs
-import { getEmployeesApi, createEmployeeApi, updateEmployeeApi, deleteEmployeeApi } from '../api/employee.api.js';
+import { getEmployeesApi, createEmployeeApi, updateEmployeeApi, deleteEmployeeApi, resetEmployeePasswordApi } from '../api/employee.api.js';
 import { getDepartmentsApi } from '../api/department.api.js';
 
 // Form Component inside Employees.jsx
@@ -170,6 +172,19 @@ export const Employees = () => {
   const [sort, setSort] = useState('name:asc');
   const [page, setPage] = useState(1);
 
+  // Dropdown & Modal States
+  const [openDropdownId, setOpenDropdownId] = useState(null);
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [tempPassword, setTempPassword] = useState('');
+  const [targetEmployee, setTargetEmployee] = useState(null);
+
+  // Close dropdowns on click anywhere
+  useEffect(() => {
+    const handleClose = () => setOpenDropdownId(null);
+    document.addEventListener('click', handleClose);
+    return () => document.removeEventListener('click', handleClose);
+  }, []);
+
   // 1. Fetch Employees
   const { data, isLoading } = useQuery({
     queryKey: ['employees', { search, department, sort, page }],
@@ -202,6 +217,43 @@ export const Employees = () => {
     }
   });
 
+  // Update Role Mutation
+  const updateRoleMutation = useMutation({
+    mutationFn: ({ id, role }) => updateEmployeeApi({ id, role }),
+    onSuccess: (data) => {
+      showToast('Employee role updated successfully', 'success');
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    },
+    onError: (err) => {
+      showToast(err.message, 'danger');
+    }
+  });
+
+  // Update Status Mutation
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, status }) => updateEmployeeApi({ id, status }),
+    onSuccess: (data) => {
+      showToast(`Employee status set to ${data.employee?.status || 'updated'}`, 'success');
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+    },
+    onError: (err) => {
+      showToast(err.message, 'danger');
+    }
+  });
+
+  // Reset Password Mutation
+  const resetPasswordMutation = useMutation({
+    mutationFn: (id) => resetEmployeePasswordApi(id),
+    onSuccess: (data) => {
+      setTempPassword(data.tempPassword);
+      setResetModalOpen(true);
+    },
+    onError: (err) => {
+      showToast(err.message, 'danger');
+    }
+  });
+
   const handleDelete = (id) => {
     if (window.confirm('Are you sure you want to remove this employee? This will also remove them from any managed departments.')) {
       deleteMutation.mutate(id);
@@ -215,14 +267,31 @@ export const Employees = () => {
 
   const headers = [
     'Employee',
-    'Email',
-    'Phone',
+    'Role',
+    'Status',
     'Department',
     'Designation',
     'Manager',
     'Joining Date',
     'Actions'
   ];
+
+  const getRoleBadgeVariant = (role) => {
+    switch (role) {
+      case 'Admin': return 'danger';
+      case 'Manager': return 'secondary';
+      case 'Team Lead': return 'warning';
+      default: return 'light';
+    }
+  };
+
+  const getStatusBadgeVariant = (status) => {
+    switch (status) {
+      case 'Active': return 'success';
+      case 'Suspended': return 'danger';
+      default: return 'light';
+    }
+  };
 
   const filterElements = (
     <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
@@ -298,11 +367,18 @@ export const Employees = () => {
               <td>
                 <div className="d-flex align-items-center gap-3">
                   <Avatar src={emp.avatar} name={emp.name} size="sm" />
-                  <span className="fw-semibold text-dark fs-7">{emp.name}</span>
+                  <div>
+                    <span className="fw-semibold text-dark fs-7 d-block">{emp.name}</span>
+                    <span className="text-muted fs-8 d-block">{emp.email}</span>
+                  </div>
                 </div>
               </td>
-              <td className="text-muted fs-7">{emp.email}</td>
-              <td className="text-muted fs-7">{emp.phone}</td>
+              <td>
+                <Badge variant={getRoleBadgeVariant(emp.role)}>{emp.role}</Badge>
+              </td>
+              <td>
+                <Badge variant={getStatusBadgeVariant(emp.status)}>{emp.status}</Badge>
+              </td>
               <td>
                 {emp.department ? (
                   <Badge variant="primary">{emp.department.name}</Badge>
@@ -324,23 +400,121 @@ export const Employees = () => {
                 {new Date(emp.joiningDate).toLocaleDateString()}
               </td>
               <td>
-                <div className="d-flex gap-2">
+                <div className="position-relative">
                   <button
                     type="button"
-                    onClick={() => openDrawer('EMPLOYEE_EDIT', emp)}
-                    className="btn btn-link text-ws-primary p-1 border-0 bg-transparent rounded-2"
-                    title="Edit Profile"
+                    onClick={(e) => { e.stopPropagation(); setOpenDropdownId(openDropdownId === emp._id ? null : emp._id); }}
+                    className="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 fs-8 py-1 px-2.5 rounded-3"
+                    style={{ borderWidth: '1.5px' }}
                   >
-                    <Icons.Edit size={16} />
+                    Manage <Icons.ChevronDown size={12} />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(emp._id)}
-                    className="btn btn-link text-ws-danger p-1 border-0 bg-transparent rounded-2"
-                    title="Delete Employee"
-                  >
-                    <Icons.Trash size={16} />
-                  </button>
+                  {openDropdownId === emp._id && (
+                    <div 
+                      className="position-absolute bg-white border border-light rounded-3 shadow-lg py-1.5 z-3 end-0 animate-slideUp"
+                      style={{ minWidth: '170px', top: '100%', marginTop: '4px' }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => { openDrawer('EMPLOYEE_EDIT', emp); setOpenDropdownId(null); }}
+                        className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-dark hover-bg-light"
+                      >
+                        <Icons.Edit size={14} className="me-2 text-ws-primary" /> Edit Details
+                      </button>
+                      
+                      {/* Change Role Section */}
+                      <div className="dropdown-divider border-light"></div>
+                      <div className="px-3 py-1 text-muted fs-9 fw-semibold text-uppercase" style={{ letterSpacing: '0.5px' }}>Change Role</div>
+                      {emp.role !== 'Manager' && emp.role !== 'Admin' && (
+                        <button
+                          type="button"
+                          onClick={() => { updateRoleMutation.mutate({ id: emp._id, role: 'Manager' }); setOpenDropdownId(null); }}
+                          className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-dark hover-bg-light"
+                        >
+                          Promote to Manager
+                        </button>
+                      )}
+                      {emp.role !== 'Team Lead' && emp.role !== 'Admin' && (
+                        <button
+                          type="button"
+                          onClick={() => { updateRoleMutation.mutate({ id: emp._id, role: 'Team Lead' }); setOpenDropdownId(null); }}
+                          className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-dark hover-bg-light"
+                        >
+                          Promote to Team Lead
+                        </button>
+                      )}
+                      {emp.role !== 'Employee' && emp.role !== 'Admin' && (
+                        <button
+                          type="button"
+                          onClick={() => { updateRoleMutation.mutate({ id: emp._id, role: 'Employee' }); setOpenDropdownId(null); }}
+                          className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-dark hover-bg-light"
+                        >
+                          Demote to Employee
+                        </button>
+                      )}
+
+                      {/* Account Status Section */}
+                      {emp.role !== 'Admin' && (
+                        <>
+                          <div className="dropdown-divider border-light"></div>
+                          <div className="px-3 py-1 text-muted fs-9 fw-semibold text-uppercase" style={{ letterSpacing: '0.5px' }}>Account Status</div>
+                          {emp.status === 'Active' ? (
+                            <button
+                              type="button"
+                              onClick={() => { updateStatusMutation.mutate({ id: emp._id, status: 'Suspended' }); setOpenDropdownId(null); }}
+                              className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-danger hover-bg-danger-light"
+                            >
+                              Suspend Account
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => { updateStatusMutation.mutate({ id: emp._id, status: 'Active' }); setOpenDropdownId(null); }}
+                              className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-success hover-bg-success-light"
+                            >
+                              Activate Account
+                            </button>
+                          )}
+                        </>
+                      )}
+
+                      {/* Password / Logs Section */}
+                      <div className="dropdown-divider border-light"></div>
+                      <button
+                        type="button"
+                        onClick={() => { 
+                          setTargetEmployee(emp); 
+                          resetPasswordMutation.mutate(emp._id); 
+                          setOpenDropdownId(null); 
+                        }}
+                        className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-dark hover-bg-light"
+                      >
+                        <Icons.Alert size={14} className="me-2 text-warning" /> Reset Password
+                      </button>
+                      
+                      <a
+                        href={`/activity-logs?user=${encodeURIComponent(emp.name)}`}
+                        onClick={() => setOpenDropdownId(null)}
+                        className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-dark hover-bg-light text-decoration-none d-block"
+                      >
+                        <Icons.Menu size={14} className="me-2 text-info" /> View Activity
+                      </a>
+
+                      {emp.role !== 'Admin' && (
+                        <>
+                          <div className="dropdown-divider border-light"></div>
+                          <button
+                            type="button"
+                            onClick={() => { handleDelete(emp._id); setOpenDropdownId(null); }}
+                            className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-danger hover-bg-danger-light"
+                          >
+                            <Icons.Trash size={14} className="me-2 text-danger" /> Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               </td>
             </tr>
@@ -375,6 +549,37 @@ export const Employees = () => {
           onCancel={closeDrawer}
         />
       </Drawer>
+
+      {/* RESET PASSWORD CONFIRMATION MODAL */}
+      <Modal
+        isOpen={resetModalOpen}
+        onClose={() => { setResetModalOpen(false); setTempPassword(''); }}
+        title="Temporary Password Generated"
+        size="md"
+        footer={
+          <Button onClick={() => { setResetModalOpen(false); setTempPassword(''); }}>
+            Close Modal
+          </Button>
+        }
+      >
+        <div className="text-center py-2 animate-fadeIn">
+          <p className="fs-7 text-muted mb-3.5">
+            A temporary password has been successfully generated for <strong>{targetEmployee?.name}</strong>.
+          </p>
+          <div 
+            className="bg-light p-3 rounded-3 border mb-3.5 font-monospace fs-5 fw-bold text-ws-primary select-all text-center"
+            style={{ borderStyle: 'dashed', letterSpacing: '1px' }}
+          >
+            {tempPassword}
+          </div>
+          <div className="alert alert-warning py-2.5 px-3 fs-8 rounded-3 text-start border-0 bg-warning-light text-warning-dark d-flex gap-2">
+            <Icons.Alert size={20} className="flex-shrink-0 mt-0.5" />
+            <span>
+              <strong>Attention:</strong> Copy this plain temporary password now. For security purposes, this password is saved as a secure hash in the database and <strong>cannot be viewed again</strong>.
+            </span>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 };
