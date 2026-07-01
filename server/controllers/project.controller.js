@@ -22,7 +22,7 @@ export const getProjectById = async (req, res, next) => {
 
 export const createProject = async (req, res, next) => {
   try {
-    const project = await projectService.create(req.body);
+    const project = await projectService.create({ ...req.body, createdBy: req.user._id });
     res.status(201).json({ success: true, project, message: 'Project created successfully' });
   } catch (error) {
     next(error);

@@ -16,6 +16,19 @@ import { useAuth } from '../context/AuthContext.jsx';
 // APIs
 import { globalSearchApi } from '../api/search.api.js';
 import { getNotificationsApi, markNotificationReadApi, markAllNotificationsReadApi } from '../api/notification.api.js';
+import { getEmployeesApi } from '../api/employee.api.js';
+import { getProjectsApi } from '../api/project.api.js';
+import { getDepartmentsApi } from '../api/department.api.js';
+
+// Drawers & Modals
+import Drawer from '../design-system/Drawer.jsx';
+import Modal from '../design-system/Modal.jsx';
+import { EmployeeForm } from '../pages/Employees.jsx';
+import { ProjectForm } from '../pages/Projects.jsx';
+import { TaskForm } from '../pages/Tasks.jsx';
+import { TeamForm } from '../pages/Teams.jsx';
+import { DepartmentForm } from '../pages/Departments.jsx';
+import { AnnouncementForm } from '../pages/Announcements.jsx';
 
 // Constants
 import { getSidebarItems } from '../constants/sidebar.js';
@@ -33,7 +46,11 @@ export const DashboardLayout = () => {
     toasts,
     dismissToast,
     openDrawer,
-    openModal
+    openModal,
+    activeModal,
+    activeDrawer,
+    closeModal,
+    closeDrawer
   } = useUI();
 
   const {
@@ -64,6 +81,29 @@ export const DashboardLayout = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Fetch lists for global create drawer / modal forms
+  const { data: empData } = useQuery({
+    queryKey: ['employees-list-all'],
+    queryFn: () => getEmployeesApi({ limit: 1000 }),
+    enabled: !!user
+  });
+
+  const { data: projData } = useQuery({
+    queryKey: ['projects-all-list'],
+    queryFn: () => getProjectsApi({ limit: 1000 }),
+    enabled: !!user
+  });
+
+  const { data: deptData } = useQuery({
+    queryKey: ['departments'],
+    queryFn: () => getDepartmentsApi(),
+    enabled: !!user
+  });
+
+  const employees = empData?.employees || [];
+  const projects = projData?.projects || [];
+  const departments = deptData?.departments || [];
 
   // 1. Fetch Notifications
   const { data: notifData } = useQuery({
@@ -151,15 +191,13 @@ export const DashboardLayout = () => {
     }
     if (user.role === 'Manager') {
       return [
-        { label: 'Create Sprint', icon: <Icons.Calendar size={14} className="text-ws-secondary" />, action: () => openModal('SPRINT_CREATE') },
         { label: 'Create Task', icon: <Icons.Tasks size={14} className="text-ws-accent" />, action: () => openDrawer('TASK_CREATE') },
-        { label: 'Assign Task', icon: <Icons.User size={14} className="text-ws-primary" />, action: () => openDrawer('TASK_CREATE') }
+        { label: 'Create Announcement', icon: <Icons.Announcements size={14} className="text-ws-danger" />, action: () => openModal('ANNOUNCEMENT_CREATE') }
       ];
     }
     if (user.role === 'Team Lead') {
       return [
-        { label: 'Create Task', icon: <Icons.Tasks size={14} className="text-ws-accent" />, action: () => openDrawer('TASK_CREATE') },
-        { label: 'Assign Task', icon: <Icons.User size={14} className="text-ws-primary" />, action: () => openDrawer('TASK_CREATE') }
+        { label: 'Create Task', icon: <Icons.Tasks size={14} className="text-ws-accent" />, action: () => openDrawer('TASK_CREATE') }
       ];
     }
     return [];
@@ -547,6 +585,82 @@ export const DashboardLayout = () => {
           </div>
         </div>
       )}
+
+      {/* Global Drawers & Modals for Speed Dial Actions */}
+      <Drawer
+        isOpen={activeDrawer.type === 'EMPLOYEE_CREATE'}
+        onClose={closeDrawer}
+        title="Add New Employee"
+      >
+        <EmployeeForm
+          departments={departments}
+          employees={employees}
+          onSuccess={closeDrawer}
+          onCancel={closeDrawer}
+        />
+      </Drawer>
+
+      <Drawer
+        isOpen={activeDrawer.type === 'PROJECT_CREATE'}
+        onClose={closeDrawer}
+        title="Launch New Project"
+      >
+        <ProjectForm
+          employees={employees}
+          onSuccess={closeDrawer}
+          onCancel={closeDrawer}
+        />
+      </Drawer>
+
+      <Drawer
+        isOpen={activeDrawer.type === 'TASK_CREATE'}
+        onClose={closeDrawer}
+        title="Create New Task"
+      >
+        <TaskForm
+          employees={employees}
+          projects={projects}
+          onSuccess={closeDrawer}
+          onCancel={closeDrawer}
+        />
+      </Drawer>
+
+      <Modal
+        isOpen={activeModal.type === 'TEAM_CREATE'}
+        onClose={closeModal}
+        title="Create New Team"
+      >
+        <TeamForm
+          employees={employees}
+          departments={departments}
+          onSuccess={closeModal}
+          onCancel={closeModal}
+        />
+      </Modal>
+
+      <Modal
+        isOpen={activeModal.type === 'DEPARTMENT_CREATE'}
+        onClose={closeModal}
+        title="Create New Department"
+      >
+        <DepartmentForm
+          employees={employees}
+          onSuccess={closeModal}
+          onCancel={closeModal}
+        />
+      </Modal>
+
+      <Modal
+        isOpen={activeModal.type === 'ANNOUNCEMENT_CREATE'}
+        onClose={closeModal}
+        title="Publish Announcement"
+      >
+        <AnnouncementForm
+          employees={employees}
+          onSuccess={closeModal}
+          onCancel={closeModal}
+        />
+      </Modal>
 
       {/* FLOAT TOAST CENTER */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />

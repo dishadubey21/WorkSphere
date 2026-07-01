@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { useUI } from '../context/UIContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 // Design System
 import Modal from '../design-system/Modal.jsx';
@@ -14,14 +15,15 @@ import Badge from '../design-system/Badge.jsx';
 import Avatar from '../design-system/Avatar.jsx';
 import Icons from '../design-system/Icons.jsx';
 import PageLayout from '../layouts/PageLayout.jsx';
+import SearchableSelect from '../design-system/SearchableSelect.jsx';
 
 // APIs
 import { getTeamsApi, createTeamApi, updateTeamApi, deleteTeamApi, addTeamMemberApi, removeTeamMemberApi } from '../api/team.api.js';
 import { getEmployeesApi } from '../api/employee.api.js';
 import { getDepartmentsApi } from '../api/department.api.js';
 
-const TeamForm = ({ team, employees = [], departments = [], onSuccess, onCancel }) => {
-  const { register, handleSubmit, formState: { errors }, reset } = useForm({
+export const TeamForm = ({ team, employees = [], departments = [], onSuccess, onCancel }) => {
+  const { register, handleSubmit, formState: { errors }, reset, control } = useForm({
     defaultValues: team ? {
       name: team.name,
       description: team.description || '',
@@ -34,6 +36,24 @@ const TeamForm = ({ team, employees = [], departments = [], onSuccess, onCancel 
       lead: ''
     }
   });
+
+  useEffect(() => {
+    if (team) {
+      reset({
+        name: team.name,
+        description: team.description || '',
+        department: team.department?._id || team.department || '',
+        lead: team.lead?._id || team.lead || ''
+      });
+    } else {
+      reset({
+        name: '',
+        description: '',
+        department: '',
+        lead: ''
+      });
+    }
+  }, [team, reset]);
 
   const queryClient = useQueryClient();
   const { showToast } = useUI();
@@ -78,23 +98,49 @@ const TeamForm = ({ team, employees = [], departments = [], onSuccess, onCancel 
         error={errors.description?.message}
         {...register('description')}
       />
-      <Select
-        label="Department"
+      <Controller
         name="department"
-        placeholder="Select Department"
-        required
-        error={errors.department?.message}
-        options={deptOptions}
-        {...register('department', { required: 'Department is required' })}
+        control={control}
+        rules={{ required: 'Department is required' }}
+        render={({ field, fieldState: { error } }) => (
+          <SearchableSelect
+            label="Department"
+            name="department"
+            required
+            options={departments.map(d => ({
+              value: d._id,
+              label: d.name,
+              subtitle: d.code
+            }))}
+            value={field.value}
+            onChange={field.onChange}
+            error={error?.message}
+            placeholder="Select Department"
+          />
+        )}
       />
-      <Select
-        label="Team Lead"
+
+      <Controller
         name="lead"
-        placeholder="Select Team Lead"
-        required
-        error={errors.lead?.message}
-        options={leadOptions}
-        {...register('lead', { required: 'Team Lead is required' })}
+        control={control}
+        rules={{ required: 'Team Lead is required' }}
+        render={({ field, fieldState: { error } }) => (
+          <SearchableSelect
+            label="Team Lead"
+            name="lead"
+            required
+            options={employees.map(e => ({
+              value: e._id,
+              label: e.name,
+              avatar: e.avatar,
+              subtitle: e.designation
+            }))}
+            value={field.value}
+            onChange={field.onChange}
+            error={error?.message}
+            placeholder="Select Team Lead"
+          />
+        )}
       />
       <div className="d-flex gap-2 justify-content-end mt-4">
         <Button variant="outline" onClick={onCancel}>Cancel</Button>
@@ -107,13 +153,16 @@ const TeamForm = ({ team, employees = [], departments = [], onSuccess, onCancel 
 };
 
 // Member management form inside Modal
-const MemberManager = ({ team, employees = [], onClose }) => {
+const MemberManager = ({ teamId, teams = [], employees = [], onClose }) => {
   const queryClient = useQueryClient();
   const { showToast } = useUI();
 
+  // Dynamically find team from list to react to list updates
+  const team = teams.find(t => t._id === teamId) || {};
+
   // Add Member Mutation
   const addMutation = useMutation({
-    mutationFn: (employeeId) => addTeamMemberApi({ id: team._id, employeeId }),
+    mutationFn: (employeeId) => addTeamMemberApi({ id: teamId, employeeId }),
     onSuccess: (data) => {
       showToast(data.message, 'success');
       queryClient.invalidateQueries({ queryKey: ['teams'] });
@@ -125,7 +174,7 @@ const MemberManager = ({ team, employees = [], onClose }) => {
 
   // Remove Member Mutation
   const removeMutation = useMutation({
-    mutationFn: (employeeId) => removeTeamMemberApi({ id: team._id, employeeId }),
+    mutationFn: (employeeId) => removeTeamMemberApi({ id: teamId, employeeId }),
     onSuccess: (data) => {
       showToast(data.message, 'success');
       queryClient.invalidateQueries({ queryKey: ['teams'] });
@@ -144,7 +193,7 @@ const MemberManager = ({ team, employees = [], onClose }) => {
       <div>
         <Typography variant="h4" className="mb-2">Team Members ({team.members?.length || 0})</Typography>
         <div className="d-flex flex-column gap-2 overflow-auto" style={{ maxHeight: '180px' }}>
-          {team.members?.length === 0 ? (
+          {!team.members || team.members.length === 0 ? (
             <span className="text-muted fs-8">No members in this team.</span>
           ) : (
             team.members.map((member) => (
@@ -173,24 +222,22 @@ const MemberManager = ({ team, employees = [], onClose }) => {
         {nonMembers.length === 0 ? (
           <span className="text-muted fs-8">All employees are already in this team.</span>
         ) : (
-          <div className="d-flex gap-2">
-            <select
-              id="add-member-select"
-              className="form-select rounded-3 border-ws-border fs-7"
-              defaultValue=""
-              onChange={(e) => {
-                if (e.target.value) {
-                  addMutation.mutate(e.target.value);
-                  e.target.value = ''; // Reset select
-                }
-              }}
-            >
-              <option value="">Select Employee to Add...</option>
-              {nonMembers.map(e => (
-                <option key={e._id} value={e._id}>{e.name} ({e.designation})</option>
-              ))}
-            </select>
-          </div>
+          <SearchableSelect
+            name="add-member"
+            options={nonMembers.map(e => ({
+              value: e._id,
+              label: e.name,
+              avatar: e.avatar,
+              subtitle: e.designation
+            }))}
+            value=""
+            onChange={(val) => {
+              if (val) {
+                addMutation.mutate(val);
+              }
+            }}
+            placeholder="Search Employee to Add..."
+          />
         )}
       </div>
     </div>
@@ -198,6 +245,7 @@ const MemberManager = ({ team, employees = [], onClose }) => {
 };
 
 export const Teams = () => {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const { activeModal, openModal, closeModal, showToast } = useUI();
 
@@ -252,12 +300,14 @@ export const Teams = () => {
         emptyIllustration="default"
         emptyTitle="No Teams Created"
         emptyDescription="Define your functional business teams to track tasks and projects."
-        emptyActionLabel="Create Team"
-        onEmptyAction={() => openModal('TEAM_CREATE')}
+        emptyActionLabel={user?.role === 'Admin' ? "Create Team" : ""}
+        onEmptyAction={user?.role === 'Admin' ? () => openModal('TEAM_CREATE') : undefined}
         actions={
-          <Button onClick={() => openModal('TEAM_CREATE')} icon={<Icons.Plus size={16} />}>
-            Create Team
-          </Button>
+          user?.role === 'Admin' && (
+            <Button onClick={() => openModal('TEAM_CREATE')} icon={<Icons.Plus size={16} />}>
+              Create Team
+            </Button>
+          )
         }
       >
         <div className="row g-4 animate-fadeIn">
@@ -276,22 +326,26 @@ export const Teams = () => {
                       >
                         <Icons.Employees size={16} />
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => openModal('TEAM_EDIT', team)}
-                        className="btn btn-link text-ws-primary p-1 border-0 bg-transparent rounded-2"
-                        title="Edit Team"
-                      >
-                        <Icons.Edit size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(team._id)}
-                        className="btn btn-link text-ws-danger p-1 border-0 bg-transparent rounded-2"
-                        title="Delete Team"
-                      >
-                        <Icons.Trash size={16} />
-                      </button>
+                      {user?.role === 'Admin' && (
+                        <button
+                          type="button"
+                          onClick={() => openModal('TEAM_EDIT', team)}
+                          className="btn btn-link text-ws-primary p-1 border-0 bg-transparent rounded-2"
+                          title="Edit Team"
+                        >
+                          <Icons.Edit size={16} />
+                        </button>
+                      )}
+                      {user?.role === 'Admin' && (
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(team._id)}
+                          className="btn btn-link text-ws-danger p-1 border-0 bg-transparent rounded-2"
+                          title="Delete Team"
+                        >
+                          <Icons.Trash size={16} />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -366,7 +420,8 @@ export const Teams = () => {
       >
         {activeModal.data && (
           <MemberManager
-            team={activeModal.data}
+            teamId={activeModal.data._id}
+            teams={teams}
             employees={employees}
             onClose={closeModal}
           />

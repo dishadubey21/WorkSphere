@@ -216,7 +216,7 @@ export const Dashboard = () => {
   const filteredStatCards = statCards.filter(card => {
     if (isAdmin) return true;
     if (isManager) {
-      return ['Active Projects', 'Open Tasks', 'Completed Tasks', 'Total Teams'].includes(card.title);
+      return ['Employees', 'Active Projects', 'Open Tasks', 'Completed Tasks', 'Pending Leaves', 'Total Teams'].includes(card.title);
     }
     if (isTeamLead) {
       return ['Open Tasks', 'Completed Tasks'].includes(card.title);
@@ -402,7 +402,7 @@ export const Dashboard = () => {
             {/* Left Side: Pending Approvals & Upcoming Deadlines */}
             <div className="col-12 col-lg-8 d-flex flex-column gap-4">
               {/* Pending Approvals (Vacations / Leaves) */}
-              {isAdmin && (
+              {(isAdmin || isManager) && (
               <Card>
                 <div className="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
                   <Typography variant="h3" className="mb-0">Pending Approvals</Typography>

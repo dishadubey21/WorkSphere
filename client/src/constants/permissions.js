@@ -45,7 +45,7 @@ export const PERMISSIONS = {
       '/leaves',
       '/settings'
     ],
-    actions: ['TASK_CREATE', 'SPRINT_CREATE'],
+    actions: ['TASK_CREATE', 'SPRINT_CREATE', 'ANNOUNCEMENT_CREATE'],
     settingsTabs: ['profile'],
     canManageEmployees: false,
     canManageRoles: false,

@@ -137,10 +137,15 @@ export const Leaves = () => {
   const { user } = useAuth();
   const { activeModal, openModal, closeModal, showToast } = useUI();
   const [activeEmployeeFilter, setActiveEmployeeFilter] = useState('');
+  const [search, setSearch] = useState('');
 
   const isAdmin = user?.role === 'Admin';
-  // If not Admin, they only view their own leaves
-  const targetEmployeeId = isAdmin ? activeEmployeeFilter : user?._id;
+  const isManager = user?.role === 'Manager';
+  const canApproveLeaves = isAdmin || isManager;
+  
+  // If not Admin/Manager, they only view their own leaves
+  const targetEmployeeId = canApproveLeaves ? activeEmployeeFilter : user?._id;
+  const targetSummaryEmployeeId = activeEmployeeFilter || user?._id;
 
   // 1. Fetch Leaves list
   const { data: leavesData, isLoading: leavesLoading } = useQuery({
@@ -152,14 +157,14 @@ export const Leaves = () => {
   const { data: empData } = useQuery({
     queryKey: ['employees-list-all'],
     queryFn: () => getEmployeesApi({ limit: 1000 }),
-    enabled: isAdmin // Only fetch employee list for admins
+    enabled: canApproveLeaves // Only fetch employee list for admins or managers
   });
 
   // 3. Fetch Leave Summary
   const { data: summaryData, isLoading: summaryLoading } = useQuery({
-    queryKey: ['leave-summary', targetEmployeeId],
-    queryFn: () => getLeaveSummaryApi(targetEmployeeId),
-    enabled: !!targetEmployeeId
+    queryKey: ['leave-summary', targetSummaryEmployeeId],
+    queryFn: () => getLeaveSummaryApi(targetSummaryEmployeeId),
+    enabled: !!targetSummaryEmployeeId
   });
 
   // 4. Update Status Mutation (Approved / Rejected)
@@ -196,6 +201,16 @@ export const Leaves = () => {
     return Math.round(ms / (1000 * 60 * 60 * 24)) + 1;
   };
 
+  const filteredLeaves = leaves.filter(leave => {
+    const empName = leave.employee?.name || '';
+    const reason = leave.reason || '';
+    const type = leave.type || '';
+    const q = search.toLowerCase();
+    return empName.toLowerCase().includes(q) ||
+           reason.toLowerCase().includes(q) ||
+           type.toLowerCase().includes(q);
+  });
+
   const headers = [
     'Employee',
     'Leave Type',
@@ -209,12 +224,27 @@ export const Leaves = () => {
 
   const filterElements = (
     <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
-      <div className="d-flex align-items-center gap-2 flex-grow-1" style={{ maxWidth: '350px' }}>
-        {isAdmin && (
+      <div className="d-flex align-items-center gap-2 flex-grow-1" style={{ maxWidth: '400px' }}>
+        <div className="position-relative w-100">
+          <span className="position-absolute top-50 start-0 translate-middle-y ps-3 text-muted">
+            <Icons.Search size={16} />
+          </span>
+          <input
+            type="text"
+            placeholder="Search leaves by employee or reason..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="form-control rounded-pill border-ws-border ps-5 py-2 fs-7"
+          />
+        </div>
+      </div>
+      <div className="d-flex flex-wrap gap-2.5">
+        {canApproveLeaves && (
           <select
             value={activeEmployeeFilter}
             onChange={(e) => setActiveEmployeeFilter(e.target.value)}
             className="form-select rounded-3 border-ws-border fs-7 py-2"
+            style={{ width: '220px' }}
           >
             <option value="">Show All Employees Summary</option>
             {employees.map(e => (
@@ -222,12 +252,12 @@ export const Leaves = () => {
             ))}
           </select>
         )}
+        {user?.role !== 'Admin' && (
+          <Button onClick={() => openModal('LEAVE_APPLY')} icon={<Icons.Plus size={16} />}>
+            Apply Leave
+          </Button>
+        )}
       </div>
-      {!isAdmin && (
-        <Button onClick={() => openModal('LEAVE_APPLY')} icon={<Icons.Plus size={16} />}>
-          Apply Leave
-        </Button>
-      )}
     </div>
   );
 
@@ -278,15 +308,14 @@ export const Leaves = () => {
         <TableLayout
           headers={headers}
           loading={leavesLoading}
-          isEmpty={leaves.length === 0}
+          isEmpty={filteredLeaves.length === 0}
           emptyIllustration="default"
           emptyTitle="No Leave Requests"
-          emptyDescription="Create your first leave request to apply for holidays."
-          emptyActionLabel="Apply Leave"
-          onEmptyAction={() => openModal('LEAVE_APPLY')}
+          emptyActionLabel={user?.role !== 'Admin' ? "Apply Leave" : ""}
+          onEmptyAction={user?.role !== 'Admin' ? () => openModal('LEAVE_APPLY') : undefined}
           filters={filterElements}
         >
-          {leaves.map((leave) => (
+          {filteredLeaves.map((leave) => (
             <tr key={leave._id}>
               <td>
                 <div className="d-flex align-items-center gap-3">
@@ -312,7 +341,7 @@ export const Leaves = () => {
               </td>
               <td>
                 {leave.status === 'Pending' ? (
-                  isAdmin ? (
+                  canApproveLeaves && leave.employee?._id?.toString() !== user?._id?.toString() ? (
                     <div className="d-flex gap-2">
                       <Button
                         size="sm"

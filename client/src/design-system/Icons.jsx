@@ -29,7 +29,10 @@ import {
   FiUploadCloud,
   FiMoreVertical,
   FiClock,
-  FiMenu
+  FiMenu,
+  FiLock,
+  FiEye,
+  FiEyeOff
 } from 'react-icons/fi';
 
 export const Icons = {
@@ -63,7 +66,10 @@ export const Icons = {
   Upload: (props) => <FiUploadCloud {...props} />,
   More: (props) => <FiMoreVertical {...props} />,
   Clock: (props) => <FiClock {...props} />,
-  Menu: (props) => <FiMenu {...props} />
+  Menu: (props) => <FiMenu {...props} />,
+  Lock: (props) => <FiLock {...props} />,
+  Eye: (props) => <FiEye {...props} />,
+  EyeOff: (props) => <FiEyeOff {...props} />
 };
 
 export default Icons;
