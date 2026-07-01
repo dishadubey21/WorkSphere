@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { useUI } from '../context/UIContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -14,6 +14,8 @@ import Badge from '../design-system/Badge.jsx';
 import Icons from '../design-system/Icons.jsx';
 import TableLayout from '../layouts/TableLayout.jsx';
 import Typography from '../design-system/Typography.jsx';
+import SearchableSelect from '../design-system/SearchableSelect.jsx';
+
 // APIs
 import { getTasksApi, createTaskApi, updateTaskApi, deleteTaskApi } from '../api/task.api.js';
 import { getEmployeesApi } from '../api/employee.api.js';
@@ -24,7 +26,7 @@ export const TaskForm = ({ task, employees = [], projects = [], onSuccess, onCan
   const { user } = useAuth();
   const isEmployee = user?.role === 'Employee';
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm({
+  const { register, handleSubmit, formState: { errors }, reset, control } = useForm({
     defaultValues: task ? {
       title: task.title,
       description: task.description || '',
@@ -45,6 +47,33 @@ export const TaskForm = ({ task, employees = [], projects = [], onSuccess, onCan
       labels: ''
     }
   });
+
+  useEffect(() => {
+    if (task) {
+      reset({
+        title: task.title,
+        description: task.description || '',
+        priority: task.priority,
+        status: task.status,
+        dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '',
+        assignee: task.assignee?._id || task.assignee || '',
+        project: task.project?._id || task.project || '',
+        labels: task.labels?.join(', ') || ''
+      });
+    } else {
+      reset({
+        title: '',
+        description: '',
+        priority: 'Medium',
+        status: 'Todo',
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        assignee: '',
+        project: '',
+        labels: ''
+      });
+    }
+  }, [task, reset]);
+
 
   const queryClient = useQueryClient();
   const { showToast } = useUI();
@@ -130,27 +159,51 @@ export const TaskForm = ({ task, employees = [], projects = [], onSuccess, onCan
       </div>
       <div className="row">
         <div className="col-6">
-          <Select
-            label="Project"
+          <Controller
             name="project"
-            placeholder="Select Project"
-            required
-            disabled={isEmployee}
-            error={errors.project?.message}
-            options={projectOptions}
-            {...register('project', { required: 'Project is required' })}
+            control={control}
+            rules={{ required: 'Project is required' }}
+            render={({ field, fieldState: { error } }) => (
+              <SearchableSelect
+                label="Project"
+                name="project"
+                required
+                disabled={isEmployee}
+                options={projects.map(p => ({
+                  value: p._id,
+                  label: p.name
+                }))}
+                value={field.value}
+                onChange={field.onChange}
+                error={error?.message}
+                placeholder="Select Project"
+              />
+            )}
           />
         </div>
         <div className="col-6">
-          <Select
-            label="Assignee"
+          <Controller
             name="assignee"
-            placeholder="Select Assignee"
-            required
-            disabled={isEmployee}
-            error={errors.assignee?.message}
-            options={assigneeOptions}
-            {...register('assignee', { required: 'Assignee is required' })}
+            control={control}
+            rules={{ required: 'Assignee is required' }}
+            render={({ field, fieldState: { error } }) => (
+              <SearchableSelect
+                label="Assignee"
+                name="assignee"
+                required
+                disabled={isEmployee}
+                options={employees.map(e => ({
+                  value: e._id,
+                  label: e.name,
+                  avatar: e.avatar,
+                  subtitle: e.designation
+                }))}
+                value={field.value}
+                onChange={field.onChange}
+                error={error?.message}
+                placeholder="Select Assignee"
+              />
+            )}
           />
         </div>
       </div>

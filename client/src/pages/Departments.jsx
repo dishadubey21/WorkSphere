@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { useUI } from '../context/UIContext.jsx';
@@ -16,10 +16,10 @@ import Icons from '../design-system/Icons.jsx';
 import PageLayout from '../layouts/PageLayout.jsx';
 
 // APIs
-import { getDepartmentsApi, createDepartmentApi, updateDepartmentApi, deleteDepartmentApi } from '../api/department.api.js';
+import { getDepartmentsApi, getDepartmentByIdApi, createDepartmentApi, updateDepartmentApi, deleteDepartmentApi } from '../api/department.api.js';
 import { getEmployeesApi } from '../api/employee.api.js';
 
-const DepartmentForm = ({ department, employees = [], onSuccess, onCancel }) => {
+export const DepartmentForm = ({ department, employees = [], onSuccess, onCancel }) => {
   const { register, handleSubmit, formState: { errors }, reset } = useForm({
     defaultValues: department ? {
       name: department.name,
@@ -35,6 +35,26 @@ const DepartmentForm = ({ department, employees = [], onSuccess, onCancel }) => 
       budget: 0
     }
   });
+
+  useEffect(() => {
+    if (department) {
+      reset({
+        name: department.name,
+        code: department.code,
+        description: department.description || '',
+        head: department.head?._id || department.head || '',
+        budget: department.budget || 0
+      });
+    } else {
+      reset({
+        name: '',
+        code: '',
+        description: '',
+        head: '',
+        budget: 0
+      });
+    }
+  }, [department, reset]);
 
   const queryClient = useQueryClient();
   const { showToast } = useUI();
@@ -111,6 +131,95 @@ const DepartmentForm = ({ department, employees = [], onSuccess, onCancel }) => 
     </form>
   );
 };
+const DepartmentDetailsView = ({ departmentId, onClose }) => {
+  const { data, isLoading } = useQuery({
+    queryKey: ['department-details', departmentId],
+    queryFn: () => getDepartmentByIdApi(departmentId),
+    enabled: !!departmentId
+  });
+
+  if (isLoading) {
+    return (
+      <div className="text-center py-4">
+        <span className="spinner-border text-ws-primary" role="status"></span>
+        <p className="text-muted mt-2 fs-8">Loading department directory...</p>
+      </div>
+    );
+  }
+
+  const deptDetails = data?.department;
+  if (!deptDetails) {
+    return <div className="text-center py-4 text-danger fs-8">Failed to load department details.</div>;
+  }
+
+  return (
+    <div className="d-flex flex-column gap-3.5">
+      <div className="bg-light p-3 rounded-3 border border-light">
+        <div className="row g-3">
+          <div className="col-6">
+            <span className="text-muted fs-8 d-block mb-0.5">Budget Allocation</span>
+            <span className="fw-bold text-dark fs-7">${deptDetails.budget?.toLocaleString() || 0}</span>
+          </div>
+          <div className="col-6">
+            <span className="text-muted fs-8 d-block mb-0.5">Total Teams</span>
+            <span className="fw-bold text-dark fs-7">{deptDetails.teamCount || 0} Teams</span>
+          </div>
+        </div>
+        {deptDetails.description && (
+          <div className="mt-3 pt-2.5 border-top border-light">
+            <span className="text-muted fs-8 d-block mb-1">Description</span>
+            <p className="fs-8 text-dark mb-0">{deptDetails.description}</p>
+          </div>
+        )}
+      </div>
+
+      <div>
+        <h6 className="font-heading fw-bold fs-7 text-dark mb-2.5">Department HOD / Head</h6>
+        {deptDetails.head ? (
+          <div className="d-flex align-items-center gap-3 p-3 rounded-3 border border-light bg-light">
+            <Avatar src={deptDetails.head.avatar} name={deptDetails.head.name} size="md" />
+            <div>
+              <div className="fw-bold text-dark fs-7">{deptDetails.head.name}</div>
+              <div className="text-muted fs-8 mb-0.5">{deptDetails.head.designation}</div>
+              <div className="text-muted fs-8">{deptDetails.head.email} {deptDetails.head.phone && `• ${deptDetails.head.phone}`}</div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-2 text-muted fs-8 border border-dashed rounded-3 bg-light">No Department Head assigned yet.</div>
+        )}
+      </div>
+
+      <div>
+        <h6 className="font-heading fw-bold fs-7 text-dark mb-2.5 d-flex align-items-center justify-content-between">
+          <span>Assigned Staff ({deptDetails.employees?.length || 0})</span>
+        </h6>
+        {(!deptDetails.employees || deptDetails.employees.length === 0) ? (
+          <div className="text-center py-4 text-muted fs-8 border border-dashed rounded-3">No staff members assigned to this department.</div>
+        ) : (
+          <div className="d-flex flex-column gap-2 overflow-auto" style={{ maxHeight: '250px' }}>
+            {deptDetails.employees.map(emp => (
+              <div key={emp._id} className="d-flex align-items-center justify-content-between p-2.5 rounded-3 border border-light hover-bg-light transition-all">
+                <div className="d-flex align-items-center gap-2.5">
+                  <Avatar src={emp.avatar} name={emp.name} size="sm" />
+                  <div>
+                    <div className="fw-bold text-dark fs-7">{emp.name}</div>
+                    <div className="text-muted fs-8">{emp.designation}</div>
+                  </div>
+                </div>
+                <div className="text-end">
+                  <span className="text-muted fs-8 d-block">Joined:</span>
+                  <span className="fw-medium text-dark fs-8">
+                    {new Date(emp.joiningDate).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export const Departments = () => {
   const queryClient = useQueryClient();
@@ -172,7 +281,15 @@ export const Departments = () => {
         <div className="row g-4 animate-fadeIn">
           {departments.map((dept) => (
             <div key={dept._id} className="col-12 col-md-6 col-lg-4">
-              <Card hoverable className="h-100 border border-light flex-column d-flex justify-content-between">
+              <Card 
+                hoverable 
+                className="h-100 border border-light flex-column d-flex justify-content-between cursor-pointer"
+                onClick={(e) => {
+                  if (!e.target.closest('button')) {
+                    openModal('DEPARTMENT_DETAILS', dept);
+                  }
+                }}
+              >
                 <div>
                   <div className="d-flex align-items-center justify-content-between mb-3">
                     <Badge variant="secondary">{dept.code}</Badge>
@@ -214,7 +331,14 @@ export const Departments = () => {
                       <span className="text-muted fs-8">No Department Head</span>
                     )}
                   </div>
-                  <div className="text-end">
+                  <div className="d-flex align-items-center gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => openModal('DEPARTMENT_DETAILS', dept)}
+                    >
+                      Details
+                    </Button>
                     <span className="badge bg-ws-primary-light text-ws-primary fw-bold fs-8 rounded-2 px-2.5 py-1.5">
                       {dept.employeeCount} Staff
                     </span>
@@ -250,6 +374,20 @@ export const Departments = () => {
           onSuccess={closeModal}
           onCancel={closeModal}
         />
+      </Modal>
+
+      <Modal
+        isOpen={activeModal.type === 'DEPARTMENT_DETAILS'}
+        onClose={closeModal}
+        title={activeModal.data ? `Department details: ${activeModal.data.name}` : 'Department details'}
+        size="lg"
+      >
+        {activeModal.data && (
+          <DepartmentDetailsView
+            departmentId={activeModal.data._id}
+            onClose={closeModal}
+          />
+        )}
       </Modal>
     </>
   );

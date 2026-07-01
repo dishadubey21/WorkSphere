@@ -40,6 +40,7 @@ class ProjectService {
     const [projects, total] = await Promise.all([
       Project.find(query)
         .populate('members', 'name email designation avatar')
+        .populate('manager', 'name email designation avatar')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit)),
@@ -59,7 +60,8 @@ class ProjectService {
 
   async getById(id) {
     const project = await Project.findById(id)
-      .populate('members', 'name email designation avatar phone joiningDate');
+      .populate('members', 'name email designation avatar phone joiningDate')
+      .populate('manager', 'name email designation avatar phone');
     if (!project) {
       const error = new Error('Project not found');
       error.statusCode = 404;

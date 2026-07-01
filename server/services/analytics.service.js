@@ -7,7 +7,18 @@ import Department from '../models/Department.js';
 import ActivityLog from '../models/ActivityLog.js';
 
 class AnalyticsService {
-  async getDashboardStats() {
+  async getDashboardStats(user) {
+    let employeeQuery = {};
+    let leaveQuery = { status: 'Pending' };
+
+    if (user && user.role === 'Manager') {
+      const reportingEmployees = await Employee.find({ manager: user._id }).select('_id');
+      const reportingEmployeeIds = reportingEmployees.map(e => e._id);
+
+      employeeQuery = { manager: user._id };
+      leaveQuery.employee = { $in: reportingEmployeeIds };
+    }
+
     const [
       employeeCount,
       activeProjectsCount,
@@ -16,11 +27,11 @@ class AnalyticsService {
       pendingLeavesCount,
       teamCount
     ] = await Promise.all([
-      Employee.countDocuments(),
+      Employee.countDocuments(employeeQuery),
       Project.countDocuments({ status: 'Active' }),
       Task.countDocuments({ status: { $in: ['Todo', 'In Progress', 'Review'] } }),
       Task.countDocuments({ status: 'Done' }),
-      Leave.countDocuments({ status: 'Pending' }),
+      Leave.countDocuments(leaveQuery),
       Team.countDocuments()
     ]);
 
@@ -34,7 +45,7 @@ class AnalyticsService {
     };
   }
 
-  async getDashboardAnalytics() {
+  async getDashboardAnalytics(user) {
     // 1. Project Progress
     const projects = await Project.find().limit(10).select('name status progress');
 

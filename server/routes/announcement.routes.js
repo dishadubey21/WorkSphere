@@ -6,16 +6,17 @@ import {
   updateAnnouncement,
   deleteAnnouncement
 } from '../controllers/announcement.controller.js';
+import { authorize } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
 router.route('/')
   .get(getAnnouncements)
-  .post(createAnnouncement);
+  .post(authorize('Admin', 'Manager'), createAnnouncement);
 
 router.route('/:id')
   .get(getAnnouncementById)
-  .put(updateAnnouncement)
-  .delete(deleteAnnouncement);
+  .put(authorize('Admin', 'Manager'), updateAnnouncement)
+  .delete(authorize('Admin', 'Manager'), deleteAnnouncement);
 
 export default router;

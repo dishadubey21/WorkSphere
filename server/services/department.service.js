@@ -1,5 +1,6 @@
 import Department from '../models/Department.js';
 import Employee from '../models/Employee.js';
+import Team from '../models/Team.js';
 import { logActivity } from '../utils/activityLogger.js';
 
 class DepartmentService {
@@ -37,11 +38,13 @@ class DepartmentService {
     }
 
     const employeeCount = await Employee.countDocuments({ department: dept._id });
+    const teamCount = await Team.countDocuments({ department: dept._id });
     const employees = await Employee.find({ department: dept._id }).select('name email designation avatar joiningDate');
 
     return {
       ...dept.toObject(),
       employeeCount,
+      teamCount,
       employees
     };
   }

@@ -20,7 +20,7 @@ import { getEmployeesApi, createEmployeeApi, updateEmployeeApi, deleteEmployeeAp
 import { getDepartmentsApi } from '../api/department.api.js';
 
 // Form Component inside Employees.jsx
-const EmployeeForm = ({ employee, departments = [], employees = [], onSuccess, onCancel }) => {
+export const EmployeeForm = ({ employee, departments = [], employees = [], onSuccess, onCancel }) => {
   const { register, handleSubmit, formState: { errors }, reset } = useForm({
     defaultValues: employee ? {
       name: employee.name,
@@ -41,7 +41,8 @@ const EmployeeForm = ({ employee, departments = [], employees = [], onSuccess, o
       manager: '',
       joiningDate: new Date().toISOString().split('T')[0],
       address: '',
-      avatar: ''
+      avatar: '',
+      password: ''
     }
   });
 
@@ -152,6 +153,19 @@ const EmployeeForm = ({ employee, departments = [], employees = [], onSuccess, o
         error={errors.address?.message}
         {...register('address')}
       />
+      {!employee && (
+        <Input
+          label="Password"
+          name="password"
+          type="password"
+          required
+          error={errors.password?.message}
+          {...register('password', { 
+            required: 'Password is required for new employees',
+            minLength: { value: 6, message: 'Password must be at least 6 characters' }
+          })}
+        />
+      )}
       <div className="d-flex gap-2 justify-content-end mt-4">
         <Button variant="outline" onClick={onCancel}>Cancel</Button>
         <Button type="submit" loading={mutation.isPending}>

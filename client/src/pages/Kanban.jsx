@@ -174,7 +174,7 @@ export const Kanban = () => {
                             
                             <div className="d-flex flex-wrap gap-1 mb-3">
                               {task.labels?.map((lbl) => (
-                                <Badge key={lbl} variant="pill" className="fs-9 py-0.5 px-1.5 bg-light text-secondary">
+                                <Badge key={lbl} variant="primary" pill className="fs-9 py-0.5 px-1.5">
                                   {lbl}
                                 </Badge>
                               ))}

@@ -100,6 +100,11 @@ body {
 .text-ws-success { color: var(--ws-success) !important; }
 .text-ws-danger { color: var(--ws-danger) !important; }
 .text-ws-text { color: var(--ws-text) !important; }
+.text-ws-primary-dark { color: #167E70 !important; }
+.text-ws-secondary-dark { color: #6D28D9 !important; }
+.text-ws-success-dark { color: #15803D !important; }
+.text-ws-danger-dark { color: #B91C1C !important; }
+.text-ws-info-dark { color: #0369A1 !important; }
 
 /* Form Control styles */
 .form-control, .form-select {

@@ -12,10 +12,17 @@ class LeaveService {
       query.status = status;
     }
 
-    return await Leave.find(query)
+    const results = await Leave.find(query)
       .populate('employee', 'name email designation avatar')
-      .populate('approvedBy', 'name designation')
-      .sort({ startDate: -1 });
+      .populate('approvedBy', 'name designation');
+
+    results.sort((a, b) => {
+      if (a.status === 'Pending' && b.status !== 'Pending') return -1;
+      if (a.status !== 'Pending' && b.status === 'Pending') return 1;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
+    return results;
   }
 
   async getById(id) {

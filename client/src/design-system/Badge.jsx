@@ -8,12 +8,12 @@ export const Badge = ({
   ...props
 }) => {
   const badgeClasses = {
-    primary: 'bg-ws-primary-light text-ws-primary',
-    secondary: 'bg-ws-secondary-light text-ws-secondary',
-    success: 'bg-ws-success-light text-ws-success',
-    danger: 'bg-ws-danger-light text-ws-danger',
+    primary: 'bg-ws-primary-light text-ws-primary-dark',
+    secondary: 'bg-ws-secondary-light text-ws-secondary-dark',
+    success: 'bg-ws-success-light text-ws-success-dark',
+    danger: 'bg-ws-danger-light text-ws-danger-dark',
     warning: 'bg-ws-accent-light text-ws-accent-dark',
-    info: 'bg-info-light text-info',
+    info: 'bg-info-light text-ws-info-dark',
     dark: 'bg-dark text-white',
     light: 'bg-light text-dark'
   };

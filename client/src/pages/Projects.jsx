@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { useUI } from '../context/UIContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -15,13 +15,14 @@ import Badge from '../design-system/Badge.jsx';
 import Avatar from '../design-system/Avatar.jsx';
 import Icons from '../design-system/Icons.jsx';
 import PageLayout from '../layouts/PageLayout.jsx';
+import SearchableSelect from '../design-system/SearchableSelect.jsx';
 
 // APIs
 import { getProjectsApi, createProjectApi, updateProjectApi, deleteProjectApi } from '../api/project.api.js';
 import { getEmployeesApi } from '../api/employee.api.js';
 
 // Project Form Component inside Projects.jsx
-const ProjectForm = ({ project, employees = [], onSuccess, onCancel }) => {
+export const ProjectForm = ({ project, employees = [], onSuccess, onCancel }) => {
   const { register, control, handleSubmit, formState: { errors }, reset } = useForm({
     defaultValues: project ? {
       name: project.name,
@@ -30,6 +31,7 @@ const ProjectForm = ({ project, employees = [], onSuccess, onCancel }) => {
       priority: project.priority,
       startDate: project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : '',
       endDate: project.endDate ? new Date(project.endDate).toISOString().split('T')[0] : '',
+      manager: project.manager?._id || project.manager || '',
       members: project.members?.map(m => m._id) || [],
       milestones: project.milestones?.map(m => ({
         title: m.title,
@@ -43,10 +45,44 @@ const ProjectForm = ({ project, employees = [], onSuccess, onCancel }) => {
       priority: 'Medium',
       startDate: new Date().toISOString().split('T')[0],
       endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days out
+      manager: '',
       members: [],
       milestones: []
     }
   });
+
+  useEffect(() => {
+    if (project) {
+      reset({
+        name: project.name,
+        description: project.description || '',
+        status: project.status,
+        priority: project.priority,
+        startDate: project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : '',
+        endDate: project.endDate ? new Date(project.endDate).toISOString().split('T')[0] : '',
+        manager: project.manager?._id || project.manager || '',
+        members: project.members?.map(m => m._id) || [],
+        milestones: project.milestones?.map(m => ({
+          title: m.title,
+          dueDate: new Date(m.dueDate).toISOString().split('T')[0],
+          completed: m.completed
+        })) || []
+      });
+    } else {
+      reset({
+        name: '',
+        description: '',
+        status: 'Planning',
+        priority: 'Medium',
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        manager: '',
+        members: [],
+        milestones: []
+      });
+    }
+  }, [project, reset]);
+
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -146,25 +182,48 @@ const ProjectForm = ({ project, employees = [], onSuccess, onCancel }) => {
         </div>
       </div>
 
-      <div>
-        <label className="form-label font-heading fw-medium text-dark fs-7 mb-2">Team Members</label>
-        <div className="p-3 border border-light rounded-3 bg-light d-flex flex-column gap-2" style={{ maxHeight: '180px', overflowY: 'auto' }}>
-          {employees.map(emp => (
-            <div key={emp._id} className="form-check d-flex align-items-center gap-2">
-              <input
-                type="checkbox"
-                value={emp._id}
-                id={`member-${emp._id}`}
-                className="form-check-input mt-0"
-                {...register('members')}
-              />
-              <label htmlFor={`member-${emp._id}`} className="form-check-label fs-7 fw-medium text-dark m-0 d-flex align-items-center gap-2">
-                <Avatar src={emp.avatar} name={emp.name} size="xs" /> {emp.name}
-              </label>
-            </div>
-          ))}
-        </div>
-      </div>
+      <Controller
+        name="manager"
+        control={control}
+        render={({ field, fieldState: { error } }) => (
+          <SearchableSelect
+            label="Project Manager (Team Lead)"
+            name="manager"
+            options={employees.map(emp => ({
+              value: emp._id,
+              label: emp.name,
+              avatar: emp.avatar,
+              subtitle: emp.designation
+            }))}
+            value={field.value}
+            onChange={field.onChange}
+            error={error?.message}
+            placeholder="Select Project Manager"
+          />
+        )}
+      />
+
+      <Controller
+        name="members"
+        control={control}
+        render={({ field, fieldState: { error } }) => (
+          <SearchableSelect
+            label="Team Members"
+            name="members"
+            multiple
+            options={employees.map(emp => ({
+              value: emp._id,
+              label: emp.name,
+              avatar: emp.avatar,
+              subtitle: emp.designation
+            }))}
+            value={field.value}
+            onChange={field.onChange}
+            error={error?.message}
+            placeholder="Select Team Members"
+          />
+        )}
+      />
 
       <div>
         <div className="d-flex align-items-center justify-content-between mb-2">
@@ -235,7 +294,7 @@ export const Projects = () => {
   const { user } = useAuth();
   const { activeDrawer, openDrawer, closeDrawer, showToast } = useUI();
 
-  const canManageProjects = user?.role === 'Admin' || user?.role === 'Manager';
+  const canManageProjects = user?.role === 'Admin';
 
   // Search & Filter State
   const [search, setSearch] = useState('');
@@ -432,6 +491,16 @@ export const Projects = () => {
                       {new Date(p.startDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - {new Date(p.endDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: '2-digit' })}
                     </span>
                   </div>
+
+                  {p.manager && (
+                    <div className="d-flex flex-column align-items-center justify-content-center text-center px-2">
+                      <span className="text-muted fs-8 mb-0.5">Lead:</span>
+                      <div className="d-flex align-items-center gap-1">
+                        <Avatar src={p.manager.avatar} name={p.manager.name} size="xs" />
+                        <span className="text-dark fw-semibold fs-8 text-truncate" style={{ maxWidth: '80px' }}>{p.manager.name.split(' ')[0]}</span>
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Avatars of members */}
                   <div className="d-flex align-items-center">

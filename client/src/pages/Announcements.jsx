@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { useUI } from '../context/UIContext.jsx';
@@ -20,7 +20,7 @@ import PageLayout from '../layouts/PageLayout.jsx';
 import { getAnnouncementsApi, createAnnouncementApi, deleteAnnouncementApi, updateAnnouncementApi } from '../api/announcement.api.js';
 import { getEmployeesApi } from '../api/employee.api.js';
 
-const AnnouncementForm = ({ announcement, employees = [], onSuccess, onCancel }) => {
+export const AnnouncementForm = ({ announcement, employees = [], onSuccess, onCancel }) => {
   const { user } = useAuth();
   const { register, handleSubmit, formState: { errors }, reset } = useForm({
     defaultValues: announcement ? {
@@ -35,6 +35,24 @@ const AnnouncementForm = ({ announcement, employees = [], onSuccess, onCancel })
       isPinned: false
     }
   });
+
+  useEffect(() => {
+    if (announcement) {
+      reset({
+        title: announcement.title,
+        content: announcement.content,
+        category: announcement.category,
+        isPinned: announcement.isPinned || false
+      });
+    } else {
+      reset({
+        title: '',
+        content: '',
+        category: 'Company',
+        isPinned: false
+      });
+    }
+  }, [announcement, reset]);
 
   const queryClient = useQueryClient();
   const { showToast } = useUI();
@@ -167,6 +185,8 @@ export const Announcements = () => {
     return map[cat] || 'secondary';
   };
 
+  const canPublish = ['Admin', 'Manager'].includes(user?.role);
+
   return (
     <>
       <PageLayout
@@ -177,12 +197,14 @@ export const Announcements = () => {
         emptyIllustration="notifications"
         emptyTitle="No Announcements Published"
         emptyDescription="Keep your workforce aligned by publishing your first company update."
-        emptyActionLabel="Announce Update"
-        onEmptyAction={() => openModal('ANNOUNCEMENT_CREATE')}
+        emptyActionLabel={canPublish ? "Announce Update" : ""}
+        onEmptyAction={canPublish ? () => openModal('ANNOUNCEMENT_CREATE') : undefined}
         actions={
-          <Button onClick={() => openModal('ANNOUNCEMENT_CREATE')} icon={<Icons.Plus size={16} />}>
-            Announce
-          </Button>
+          canPublish ? (
+            <Button onClick={() => openModal('ANNOUNCEMENT_CREATE')} icon={<Icons.Plus size={16} />}>
+              Announce
+            </Button>
+          ) : null
         }
       >
         <div className="row g-4 animate-fadeIn">
@@ -227,7 +249,7 @@ export const Announcements = () => {
                       </span>
                     )}
                   </div>
-                  { (user?.role === 'Admin' || item.createdBy?._id === user?._id || item.createdBy === user?._id || item.publishedBy?._id === user?._id || item.publishedBy === user?._id) && (
+                  { (user?.role === 'Admin' || (user?.role === 'Manager' && (item.createdBy?._id === user?._id || item.createdBy === user?._id || item.publishedBy?._id === user?._id || item.publishedBy === user?._id))) && (
                     <div className="d-flex gap-1">
                       <button
                         type="button"

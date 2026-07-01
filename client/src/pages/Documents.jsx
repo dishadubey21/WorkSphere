@@ -160,26 +160,14 @@ const DocumentUploadForm = ({ employees = [], projects = [], onSuccess, onCancel
         {...register('category')}
       />
       
-      {!isAdminOrManager ? (
-        <div className="d-flex align-items-center gap-3 p-3 bg-light rounded-3 border border-light mb-1">
-          <Avatar src={user?.avatar} name={user?.name} size="sm" />
-          <div>
-            <span className="text-muted fs-8 d-block fw-semibold" style={{ letterSpacing: '0.5px' }}>UPLOADING AS</span>
-            <span className="fw-semibold text-dark fs-7 d-block">{user?.name}</span>
-            <span className="text-muted fs-8 d-block">{user?.email}</span>
-          </div>
+      <div className="d-flex align-items-center gap-3 p-3 bg-light rounded-3 border border-light mb-1">
+        <Avatar src={user?.avatar} name={user?.name} size="sm" />
+        <div>
+          <span className="text-muted fs-8 d-block fw-semibold" style={{ letterSpacing: '0.5px' }}>UPLOADING AS</span>
+          <span className="fw-semibold text-dark fs-7 d-block">{user?.name}</span>
+          <span className="text-muted fs-8 d-block">{user?.email}</span>
         </div>
-      ) : (
-        <Select
-          label="Uploading Employee"
-          name="uploadedBy"
-          placeholder="Select Employee"
-          required
-          error={errors.uploadedBy?.message}
-          options={employeeOptions}
-          {...register('uploadedBy', { required: 'Uploader is required' })}
-        />
-      )}
+      </div>
 
       <Select
         label="Linked Project (Optional)"
