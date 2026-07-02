@@ -1,22 +1,25 @@
 import nodemailer from 'nodemailer';
 import logger from '../utils/logger.js';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 class EmailService {
   constructor() {
-    // Dynamically create SMTP transporter using env variables
-    const secureValue = process.env.MAIL_SECURE === 'true';
+    // Dynamically create SMTP transporter using Gmail env variables
+    const secureValue = process.env.SMTP_PORT === '465';
     
     this.transporter = nodemailer.createTransport({
-      host: process.env.MAIL_HOST || 'smtp-relay.brevo.com',
-      port: parseInt(process.env.MAIL_PORT || '587', 10),
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT || '587', 10),
       secure: secureValue,
       auth: {
-        user: process.env.MAIL_USER || '',
-        pass: process.env.MAIL_PASS || ''
+        user: process.env.SMTP_EMAIL || '',
+        pass: process.env.SMTP_PASSWORD || ''
       }
     });
 
-    this.from = process.env.MAIL_FROM || 'no-reply@worksphere.com';
+    this.from = process.env.SMTP_EMAIL || 'no-reply@worksphere.com';
     this.clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
   }
 
