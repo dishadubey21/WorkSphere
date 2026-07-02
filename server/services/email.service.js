@@ -3,18 +3,27 @@ import logger from '../utils/logger.js';
 
 class EmailService {
   constructor() {
-    // Dynamically create SMTP transporter using env variables
     const secureValue = process.env.MAIL_SECURE === 'true';
-    
-    this.transporter = nodemailer.createTransport({
-      host: process.env.MAIL_HOST || 'smtp-relay.brevo.com',
-      port: parseInt(process.env.MAIL_PORT || '587', 10),
-      secure: secureValue,
-      auth: {
-        user: process.env.MAIL_USER || '',
-        pass: process.env.MAIL_PASS || ''
-      }
-    });
+    const hasCredentials = process.env.MAIL_USER && process.env.MAIL_PASS;
+
+    if (!hasCredentials) {
+      logger.info('No SMTP credentials found in environment. Using JSON Mock Transport for emails.');
+      this.transporter = nodemailer.createTransport({
+        jsonTransport: true
+      });
+      this.isMock = true;
+    } else {
+      this.transporter = nodemailer.createTransport({
+        host: process.env.MAIL_HOST || 'smtp-relay.brevo.com',
+        port: parseInt(process.env.MAIL_PORT || '587', 10),
+        secure: secureValue,
+        auth: {
+          user: process.env.MAIL_USER,
+          pass: process.env.MAIL_PASS
+        }
+      });
+      this.isMock = false;
+    }
 
     this.from = process.env.MAIL_FROM || 'no-reply@worksphere.com';
     this.clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
@@ -24,6 +33,10 @@ class EmailService {
    * Helper to verify connection to SMTP server on startup/check
    */
   async verifyConnection() {
+    if (this.isMock) {
+      logger.info('SMTP Transporter verified successfully (JSON Mock Transport).');
+      return true;
+    }
     try {
       await this.transporter.verify();
       logger.info('SMTP Transporter verified successfully.');
@@ -48,7 +61,12 @@ class EmailService {
       };
 
       const info = await this.transporter.sendMail(mailOptions);
-      logger.info(`Email successfully sent: messageId=${info.messageId} to=${to}`);
+      if (this.isMock) {
+        logger.info(`[MOCK EMAIL SENT] To: ${to} | Subject: ${subject}`);
+        logger.info(`[MOCK EMAIL CONTENT]\n${text}\n`);
+      } else {
+        logger.info(`Email successfully sent: messageId=${info.messageId} to=${to}`);
+      }
       return info;
     } catch (error) {
       logger.error(`Error delivering email to ${to}:`, error.message);

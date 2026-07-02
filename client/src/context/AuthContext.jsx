@@ -26,7 +26,6 @@ export const AuthProvider = ({ children }) => {
 
   // Login handler
   const login = async (email, password) => {
-    setIsLoading(true);
     try {
       const res = await apiClient.post('/auth/login', { email, password });
       if (res.success && res.user) {
@@ -36,14 +35,11 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       setUser(null);
       throw err;
-    } finally {
-      setIsLoading(false);
     }
   };
 
   // Registration handler
   const registerUser = async (data) => {
-    setIsLoading(true);
     try {
       const res = await apiClient.post('/auth/register', data);
       if (res.success && res.user) {
@@ -53,21 +49,17 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       setUser(null);
       throw err;
-    } finally {
-      setIsLoading(false);
     }
   };
 
   // Logout handler
   const logout = async () => {
-    setIsLoading(true);
     try {
       await apiClient.post('/auth/logout');
     } catch (err) {
       console.error('Logout request failed', err);
     } finally {
       setUser(null);
-      setIsLoading(false);
     }
   };
 
