@@ -46,6 +46,35 @@ export const EmployeeForm = ({ employee, departments = [], employees = [], onSuc
     }
   });
 
+  useEffect(() => {
+    if (employee) {
+      reset({
+        name: employee.name,
+        email: employee.email,
+        phone: employee.phone,
+        department: employee.department?._id || employee.department || '',
+        designation: employee.designation,
+        manager: employee.manager?._id || employee.manager || '',
+        joiningDate: employee.joiningDate ? new Date(employee.joiningDate).toISOString().split('T')[0] : '',
+        address: employee.address || '',
+        avatar: employee.avatar || ''
+      });
+    } else {
+      reset({
+        name: '',
+        email: '',
+        phone: '',
+        department: '',
+        designation: '',
+        manager: '',
+        joiningDate: new Date().toISOString().split('T')[0],
+        address: '',
+        avatar: '',
+        password: ''
+      });
+    }
+  }, [employee, reset]);
+
   const queryClient = useQueryClient();
   const { showToast } = useUI();
 
@@ -542,12 +571,14 @@ export const Employees = () => {
         onClose={closeDrawer}
         title="Add New Employee"
       >
-        <EmployeeForm
-          departments={departments}
-          employees={allEmployees}
-          onSuccess={closeDrawer}
-          onCancel={closeDrawer}
-        />
+        {activeDrawer.type === 'EMPLOYEE_CREATE' && (
+          <EmployeeForm
+            departments={departments}
+            employees={allEmployees}
+            onSuccess={closeDrawer}
+            onCancel={closeDrawer}
+          />
+        )}
       </Drawer>
 
       <Drawer
@@ -555,13 +586,15 @@ export const Employees = () => {
         onClose={closeDrawer}
         title="Edit Employee Profile"
       >
-        <EmployeeForm
-          employee={activeDrawer.data}
-          departments={departments}
-          employees={allEmployees}
-          onSuccess={closeDrawer}
-          onCancel={closeDrawer}
-        />
+        {activeDrawer.type === 'EMPLOYEE_EDIT' && (
+          <EmployeeForm
+            employee={activeDrawer.data}
+            departments={departments}
+            employees={allEmployees}
+            onSuccess={closeDrawer}
+            onCancel={closeDrawer}
+          />
+        )}
       </Drawer>
 
       {/* RESET PASSWORD CONFIRMATION MODAL */}

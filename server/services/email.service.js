@@ -1,10 +1,13 @@
 import nodemailer from 'nodemailer';
 import logger from '../utils/logger.js';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 class EmailService {
   constructor() {
-    const secureValue = process.env.MAIL_SECURE === 'true';
-    const hasCredentials = process.env.MAIL_USER && process.env.MAIL_PASS;
+    // Check if new SMTP environment variables are configured
+    const hasCredentials = process.env.SMTP_EMAIL && process.env.SMTP_PASSWORD;
 
     if (!hasCredentials) {
       logger.info('No SMTP credentials found in environment. Using JSON Mock Transport for emails.');
@@ -13,19 +16,20 @@ class EmailService {
       });
       this.isMock = true;
     } else {
+      const secureValue = process.env.SMTP_PORT === '465';
       this.transporter = nodemailer.createTransport({
-        host: process.env.MAIL_HOST || 'smtp-relay.brevo.com',
-        port: parseInt(process.env.MAIL_PORT || '587', 10),
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: parseInt(process.env.SMTP_PORT || '587', 10),
         secure: secureValue,
         auth: {
-          user: process.env.MAIL_USER,
-          pass: process.env.MAIL_PASS
+          user: process.env.SMTP_EMAIL,
+          pass: process.env.SMTP_PASSWORD
         }
       });
       this.isMock = false;
     }
 
-    this.from = process.env.MAIL_FROM || 'no-reply@worksphere.com';
+    this.from = process.env.SMTP_EMAIL || 'no-reply@worksphere.com';
     this.clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
   }
 

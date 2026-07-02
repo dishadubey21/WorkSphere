@@ -147,6 +147,7 @@ body {
   overflow-x: auto;
   border-radius: 12px;
   border: 1px solid var(--ws-border);
+  min-height: 320px; /* Ensures space for dropdowns when row count is small */
 }
 .table-sticky-header th {
   position: sticky;
