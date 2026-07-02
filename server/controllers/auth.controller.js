@@ -9,12 +9,14 @@ const sendTokenResponse = (user, statusCode, res) => {
     expiresIn: '30d'
   });
 
+  const isProduction = process.env.NODE_ENV === "production";
+
   const cookieOptions = {
-    expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+    expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/'
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+    path: "/"
   };
 
   res
@@ -108,10 +110,12 @@ export const login = async (req, res, next) => {
 // @access  Private
 export const logout = async (req, res, next) => {
   try {
-    res.cookie('token', 'none', {
-      expires: new Date(Date.now() + 10 * 1000), // clear immediately
+    res.cookie("token", "none", {
+      expires: new Date(Date.now() + 10 * 1000),
       httpOnly: true,
-      path: '/'
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+      path: "/"
     });
 
     res.status(200).json({ success: true, message: 'Successfully logged out' });
