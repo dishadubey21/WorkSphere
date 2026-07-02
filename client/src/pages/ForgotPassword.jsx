@@ -24,7 +24,7 @@ export const ForgotPassword = () => {
     setApiError('');
     try {
       await apiClient.post('/auth/forgot-password', { email: data.email });
-      showToast('Reset email simulated successfully! Check backend logs.', 'success');
+      showToast('Reset request processed successfully.', 'success');
       setIsSubmitted(true);
     } catch (err) {
       const errorMsg = err.message || 'Failed to submit reset request';
@@ -51,7 +51,7 @@ export const ForgotPassword = () => {
       )}
 
       {/* Left Pane - Premium Branding */}
-      <AuthLeftPane subtitle="Forgot your credentials? Provide your registered email and we will simulate a temporary password reset token link." />
+      <AuthLeftPane subtitle="Forgot your credentials? Provide your registered email and we will send a temporary password reset link to your inbox." />
 
       {/* Right Pane - Form Card */}
       <div className="col-12 col-md-7 col-lg-6 d-flex align-items-center justify-content-center p-4 p-md-5 bg-white">
@@ -95,18 +95,10 @@ export const ForgotPassword = () => {
               <div className="bg-ws-success-light rounded-circle p-3 mb-3.5 d-inline-flex align-items-center justify-content-center" style={{ width: '64px', height: '64px' }}>
                 <Icons.Check size={28} className="text-ws-success" />
               </div>
-              <h3 className="font-heading fw-bold text-dark mb-2">Check Terminal Console</h3>
+              <h3 className="font-heading fw-bold text-dark mb-2">Check Your Inbox</h3>
               <p className="text-muted fs-8 mb-4">
-                Since this is a localized system, a mock password reset link containing a token has been logged to the **Node server console**.
+                If an account with this email exists, a password reset link has been sent.
               </p>
-              <div className="p-3 bg-light rounded-3 text-start mb-4 border border-light">
-                <span className="fw-semibold fs-8 text-dark mb-1 d-block">Next steps:</span>
-                <ol className="fs-8 text-muted mb-0 ps-3 leading-relaxed">
-                  <li>Check node backend server logs.</li>
-                  <li>Copy and navigate to the simulated URL.</li>
-                  <li>Set your secure new password.</li>
-                </ol>
-              </div>
               <Button onClick={() => navigate('/login')} className="w-100 py-2 fs-7 fw-bold" variant="light">
                 Return to Login
               </Button>

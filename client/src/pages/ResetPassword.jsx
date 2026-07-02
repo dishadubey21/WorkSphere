@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useUI } from '../context/UIContext.jsx';
 import apiClient from '../api/client.js';
 import AuthLeftPane from '../components/AuthLeftPane.jsx';
@@ -11,25 +11,26 @@ import Icons from '../design-system/Icons.jsx';
 export const ResetPassword = () => {
   const navigate = useNavigate();
   const { showToast } = useUI();
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get('token');
+  const { token } = useParams();
 
   const [isSuccess, setIsSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [apiError, setApiError] = useState('');
+  const [countdown, setCountdown] = useState(3);
   
   // Password strength states
   const [passStrength, setPassStrength] = useState({ score: 0, label: 'Weak', color: 'bg-danger' });
 
-  const { register, handleSubmit, watch, formState: { errors } } = useForm({
-    defaultValues: { password: '', confirmPassword: '' }
+  const { register, handleSubmit, watch, formState: { errors, isValid } } = useForm({
+    defaultValues: { password: '', confirmPassword: '' },
+    mode: 'onChange'
   });
 
   const passwordVal = watch('password');
 
-  // Calculate password strength
+  // Calculate password strength & updates checklist validation
   useEffect(() => {
     if (!passwordVal) {
       setPassStrength({ score: 0, label: 'Weak', color: 'bg-danger' });
@@ -58,6 +59,22 @@ export const ResetPassword = () => {
 
     setPassStrength({ score, label, color });
   }, [passwordVal]);
+
+  // Automatic countdown and redirection flow after successful password reset
+  useEffect(() => {
+    if (!isSuccess) return;
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          navigate('/login');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isSuccess, navigate]);
 
   const onSubmit = async (data) => {
     if (!token) {
@@ -112,7 +129,7 @@ export const ResetPassword = () => {
               {!token && (
                 <div className="alert alert-warning py-2.5 px-3 fs-8 rounded-3 mb-4 d-flex align-items-center gap-2 border-0 bg-warning-light text-warning">
                   <Icons.Alert size={16} />
-                  <span>Warning: No reset token detected in URL query parameter.</span>
+                  <span>Warning: No reset token detected in URL parameter.</span>
                 </div>
               )}
 
@@ -135,7 +152,10 @@ export const ResetPassword = () => {
                     error={errors.password?.message}
                     {...register('password', {
                       required: 'Password is required',
-                      minLength: { value: 6, message: 'Password must be at least 6 characters' }
+                      pattern: {
+                        value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/,
+                        message: 'Must be at least 8 characters and include uppercase, lowercase, numbers, and symbols.'
+                      }
                     })}
                   />
                   <button
@@ -198,7 +218,7 @@ export const ResetPassword = () => {
                   </div>
                 )}
 
-                <Button type="submit" loading={isLoading} className="w-100 py-2.5 fs-7 fw-bold shadow-sm mt-1">
+                <Button type="submit" loading={isLoading} disabled={!isValid} className="w-100 py-2.5 fs-7 fw-bold shadow-sm mt-1">
                   Update Password
                 </Button>
               </form>
@@ -210,10 +230,10 @@ export const ResetPassword = () => {
               </div>
               <h3 className="font-heading fw-bold text-dark mb-2">Password Restored</h3>
               <p className="text-muted fs-8 mb-4">
-                Your password has been successfully updated. You can now use your new password to sign in.
+                Your password has been successfully updated. Redirecting you to the sign in page in <strong>{countdown}</strong> seconds...
               </p>
               <Button onClick={() => navigate('/login')} className="w-100 py-2 fs-7 fw-bold">
-                Go to Sign In
+                Go to Sign In Now
               </Button>
             </div>
           )}
