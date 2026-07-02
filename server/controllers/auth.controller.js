@@ -108,19 +108,27 @@ export const login = async (req, res, next) => {
 // @desc    Logout user / Clear HttpOnly cookie
 // @route   POST /api/auth/logout
 // @access  Private
-export const logout = async (req, res, next) => {
+export const logout = async (req, res) => {
   try {
-    res.cookie("token", "none", {
-      expires: new Date(Date.now() + 10 * 1000),
+    const isProduction = process.env.NODE_ENV === "production";
+
+
+    res.clearCookie("token", {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? "none" : "lax",
-      path: "/"
+      path: "/",
     });
 
-    res.status(200).json({ success: true, message: 'Successfully logged out' });
+    res.status(200).json({
+      success: true,
+      message: "Successfully logged out",
+    });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
 };
 
