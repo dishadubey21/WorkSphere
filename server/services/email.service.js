@@ -6,18 +6,28 @@ dotenv.config();
 
 class EmailService {
   constructor() {
-    // Dynamically create SMTP transporter using Gmail env variables
-    const secureValue = process.env.SMTP_PORT === '465';
-    
-    this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.SMTP_PORT || '587', 10),
-      secure: secureValue,
-      auth: {
-        user: process.env.SMTP_EMAIL || '',
-        pass: process.env.SMTP_PASSWORD || ''
-      }
-    });
+    // Check if new SMTP environment variables are configured
+    const hasCredentials = process.env.SMTP_EMAIL && process.env.SMTP_PASSWORD;
+
+    if (!hasCredentials) {
+      logger.info('No SMTP credentials found in environment. Using JSON Mock Transport for emails.');
+      this.transporter = nodemailer.createTransport({
+        jsonTransport: true
+      });
+      this.isMock = true;
+    } else {
+      const secureValue = process.env.SMTP_PORT === '465';
+      this.transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: parseInt(process.env.SMTP_PORT || '587', 10),
+        secure: secureValue,
+        auth: {
+          user: process.env.SMTP_EMAIL,
+          pass: process.env.SMTP_PASSWORD
+        }
+      });
+      this.isMock = false;
+    }
 
     this.from = process.env.SMTP_EMAIL || 'no-reply@worksphere.com';
     this.clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
@@ -27,6 +37,10 @@ class EmailService {
    * Helper to verify connection to SMTP server on startup/check
    */
   async verifyConnection() {
+    if (this.isMock) {
+      logger.info('SMTP Transporter verified successfully (JSON Mock Transport).');
+      return true;
+    }
     try {
       await this.transporter.verify();
       logger.info('SMTP Transporter verified successfully.');
@@ -51,7 +65,12 @@ class EmailService {
       };
 
       const info = await this.transporter.sendMail(mailOptions);
-      logger.info(`Email successfully sent: messageId=${info.messageId} to=${to}`);
+      if (this.isMock) {
+        logger.info(`[MOCK EMAIL SENT] To: ${to} | Subject: ${subject}`);
+        logger.info(`[MOCK EMAIL CONTENT]\n${text}\n`);
+      } else {
+        logger.info(`Email successfully sent: messageId=${info.messageId} to=${to}`);
+      }
       return info;
     } catch (error) {
       logger.error(`Error delivering email to ${to}:`, error.message);
