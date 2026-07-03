@@ -646,6 +646,7 @@ export const Settings = () => {
                               disabled={updateRoleMutation.isPending}
                             >
                               <option value="Employee">Employee</option>
+                              <option value="Team Lead">Team Lead</option>
                               <option value="Manager">Manager</option>
                               <option value="Admin">Admin</option>
                             </select>
