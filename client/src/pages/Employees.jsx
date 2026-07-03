@@ -487,6 +487,15 @@ export const Employees = () => {
                           Promote to Team Lead
                         </button>
                       )}
+                      {emp.role !== 'Admin' && (
+                        <button
+                          type="button"
+                          onClick={() => { updateRoleMutation.mutate({ id: emp._id, role: 'Admin' }); setOpenDropdownId(null); }}
+                          className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-dark hover-bg-light"
+                        >
+                          Promote to Admin
+                        </button>
+                      )}
                       {emp.role !== 'Employee' && emp.role !== 'Admin' && (
                         <button
                           type="button"

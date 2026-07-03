@@ -86,7 +86,7 @@ class EmployeeService {
     return employee;
   }
 
-  async update(id, data) {
+  async update(id, data, requestingUser) {
     const employee = await Employee.findById(id);
     if (!employee) {
       const error = new Error('Employee not found');
@@ -106,6 +106,14 @@ class EmployeeService {
     const roleChanged = data.role && data.role !== employee.role;
     const oldRole = employee.role;
     const newRole = data.role;
+
+    if (roleChanged) {
+      if (!requestingUser || requestingUser.role !== 'Admin') {
+        const error = new Error('Forbidden: Only Administrators can modify employee roles');
+        error.statusCode = 403;
+        throw error;
+      }
+    }
 
     const statusChanged = data.status && data.status !== employee.status;
     const oldStatus = employee.status;
