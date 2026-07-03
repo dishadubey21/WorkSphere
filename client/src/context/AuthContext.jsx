@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import apiClient from '../api/client.js';
+import { queryClient } from '../api/queryClient.js';
 
 const AuthContext = createContext(null);
 
@@ -60,6 +61,7 @@ export const AuthProvider = ({ children }) => {
       console.error('Logout request failed', err);
     } finally {
       setUser(null);
+      queryClient.clear();
     }
   };
 

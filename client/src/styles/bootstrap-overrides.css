@@ -85,6 +85,11 @@ body {
 }
 
 /* BG utilities overrides */
+.bg-ws-primary { background-color: var(--ws-primary) !important; }
+.bg-ws-secondary { background-color: var(--ws-secondary) !important; }
+.bg-ws-success { background-color: var(--ws-success) !important; }
+.bg-ws-danger { background-color: var(--ws-danger) !important; }
+.bg-ws-accent { background-color: var(--ws-accent) !important; }
 .bg-ws-primary-light { background-color: var(--ws-primary-light) !important; }
 .bg-ws-secondary-light { background-color: var(--ws-secondary-light) !important; }
 .bg-ws-success-light { background-color: var(--ws-success-light) !important; }

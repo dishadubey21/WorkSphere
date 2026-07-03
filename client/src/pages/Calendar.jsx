@@ -64,6 +64,12 @@ export const Calendar = () => {
     calendarDays.push(new Date(year, month, day));
   }
 
+  // Fill trailing empty cells to make a complete week row (multiple of 7)
+  const totalCells = Math.ceil(calendarDays.length / 7) * 7;
+  while (calendarDays.length < totalCells) {
+    calendarDays.push(null);
+  }
+
   // Get events on a specific day
   const getEventsForDay = (date) => {
     if (!date) return [];
@@ -150,7 +156,7 @@ export const Calendar = () => {
           {/* Weekday headers */}
           <div className="row text-center fw-bold fs-8 text-muted text-uppercase mb-2">
             {daysOfWeek.map(d => (
-              <div key={d} className="col py-2 bg-light border-bottom" style={{ flex: '1 0 14%' }}>{d}</div>
+              <div key={d} className="col py-2 bg-light border-bottom" style={{ flex: '0 0 14.2857%', maxWidth: '14.2857%' }}>{d}</div>
             ))}
           </div>
 
@@ -164,7 +170,7 @@ export const Calendar = () => {
                 <div
                   key={idx}
                   className={`col border-end border-bottom p-2 d-flex flex-column gap-1.5 align-items-start ${!date ? 'bg-light opacity-50' : ''}`}
-                  style={{ flex: '1 0 14%', height: '110px', overflowY: 'auto' }}
+                  style={{ flex: '0 0 14.2857%', maxWidth: '14.2857%', height: '110px', overflowY: 'auto' }}
                 >
                   {date && (
                     <div className="d-flex justify-content-between align-items-center w-100 mb-1">
