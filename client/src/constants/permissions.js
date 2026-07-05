@@ -34,6 +34,7 @@ export const PERMISSIONS = {
   [ROLES.MANAGER]: {
     routes: [
       '/dashboard',
+      '/employees',
       '/team',
       '/teams',
       '/projects',

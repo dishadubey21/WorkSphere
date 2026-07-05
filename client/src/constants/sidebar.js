@@ -23,6 +23,7 @@ export const getSidebarItems = (role) => {
   if (role === 'Manager') {
     return [
       { label: 'Dashboard', path: ROUTES.DASHBOARD, iconKey: 'Dashboard' },
+      { label: 'Employees', path: ROUTES.EMPLOYEES, iconKey: 'Employees' },
       { label: 'Teams', path: ROUTES.TEAMS, iconKey: 'Teams' },
       { label: 'Projects', path: ROUTES.PROJECTS, iconKey: 'Projects' },
       { label: 'Tasks', path: ROUTES.TASKS, iconKey: 'Tasks' },

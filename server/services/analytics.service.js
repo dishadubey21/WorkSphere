@@ -10,13 +10,33 @@ class AnalyticsService {
   async getDashboardStats(user) {
     let employeeQuery = {};
     let leaveQuery = { status: 'Pending' };
+    let taskQuery = {};
+    let projectQuery = { status: 'Active' };
+    let teamQuery = {};
 
     if (user && user.role === 'Manager') {
-      const reportingEmployees = await Employee.find({ manager: user._id }).select('_id');
+      const Department = (await import('../models/Department.js')).default;
+      const myDepts = await Department.find({ head: user._id });
+      const deptIds = myDepts.map(d => d._id);
+
+      const reportingEmployees = await Employee.find({
+        $or: [
+          { _id: user._id },
+          { manager: user._id },
+          { department: { $in: deptIds } }
+        ]
+      }).select('_id');
       const reportingEmployeeIds = reportingEmployees.map(e => e._id);
 
-      employeeQuery = { manager: user._id };
+      employeeQuery = { _id: { $in: reportingEmployeeIds } };
       leaveQuery.employee = { $in: reportingEmployeeIds };
+      taskQuery.assignee = { $in: reportingEmployeeIds };
+      
+      projectQuery.$or = [
+        { manager: user._id },
+        { createdBy: user._id },
+        { members: { $in: reportingEmployeeIds } }
+      ];
     }
 
     const [
@@ -28,11 +48,11 @@ class AnalyticsService {
       teamCount
     ] = await Promise.all([
       Employee.countDocuments(employeeQuery),
-      Project.countDocuments({ status: 'Active' }),
-      Task.countDocuments({ status: { $in: ['Todo', 'In Progress', 'Review'] } }),
-      Task.countDocuments({ status: 'Done' }),
+      Project.countDocuments(projectQuery),
+      Task.countDocuments({ ...taskQuery, status: { $in: ['Todo', 'In Progress', 'Review'] } }),
+      Task.countDocuments({ ...taskQuery, status: 'Done' }),
       Leave.countDocuments(leaveQuery),
-      Team.countDocuments()
+      Team.countDocuments(teamQuery)
     ]);
 
     return {
@@ -46,13 +66,49 @@ class AnalyticsService {
   }
 
   async getDashboardAnalytics(user) {
+    let reportingEmployeeIds = null;
+    let projectFilter = {};
+    let taskFilter = {};
+    let employeeFilter = {};
+    let activityFilter = {};
+    
+    if (user && user.role === 'Manager') {
+      const Department = (await import('../models/Department.js')).default;
+      const myDepts = await Department.find({ head: user._id });
+      const deptIds = myDepts.map(d => d._id);
+
+      const reportingEmployees = await Employee.find({
+        $or: [
+          { _id: user._id },
+          { manager: user._id },
+          { department: { $in: deptIds } }
+        ]
+      }).select('_id name');
+      reportingEmployeeIds = reportingEmployees.map(e => e._id);
+      const reportingEmployeeNames = reportingEmployees.map(e => e.name);
+      
+      projectFilter.$or = [
+        { manager: user._id },
+        { createdBy: user._id },
+        { members: { $in: reportingEmployeeIds } }
+      ];
+      
+      taskFilter.assignee = { $in: reportingEmployeeIds };
+      employeeFilter = { _id: { $in: reportingEmployeeIds } };
+      activityFilter = { user: { $in: reportingEmployeeNames } };
+    }
+
     // 1. Project Progress
-    const projects = await Project.find().limit(10).select('name status progress');
+    const projects = await Project.find(projectFilter).limit(10).select('name status progress');
 
     // 2. Task Distribution by Status
-    const taskStatusCounts = await Task.aggregate([
-      { $group: { _id: '$status', count: { $sum: 1 } } }
-    ]);
+    const taskStatusPipeline = [];
+    if (user && user.role === 'Manager') {
+      taskStatusPipeline.push({ $match: taskFilter });
+    }
+    taskStatusPipeline.push({ $group: { _id: '$status', count: { $sum: 1 } } });
+    const taskStatusCounts = await Task.aggregate(taskStatusPipeline);
+    
     const taskStatus = { Todo: 0, 'In Progress': 0, Review: 0, Done: 0 };
     taskStatusCounts.forEach(item => {
       if (taskStatus[item._id] !== undefined) {
@@ -61,9 +117,13 @@ class AnalyticsService {
     });
 
     // 3. Task Distribution by Priority
-    const taskPriorityCounts = await Task.aggregate([
-      { $group: { _id: '$priority', count: { $sum: 1 } } }
-    ]);
+    const taskPriorityPipeline = [];
+    if (user && user.role === 'Manager') {
+      taskPriorityPipeline.push({ $match: taskFilter });
+    }
+    taskPriorityPipeline.push({ $group: { _id: '$priority', count: { $sum: 1 } } });
+    const taskPriorityCounts = await Task.aggregate(taskPriorityPipeline);
+    
     const taskPriority = { Low: 0, Medium: 0, High: 0, Urgent: 0 };
     taskPriorityCounts.forEach(item => {
       if (taskPriority[item._id] !== undefined) {
@@ -74,7 +134,7 @@ class AnalyticsService {
     // 4. Department Distribution
     const depts = await Department.find().select('name');
     const departmentDistribution = await Promise.all(depts.map(async (dept) => {
-      const count = await Employee.countDocuments({ department: dept._id });
+      const count = await Employee.countDocuments({ ...employeeFilter, department: dept._id });
       return {
         name: dept.name,
         value: count
@@ -95,6 +155,7 @@ class AnalyticsService {
       nextDay.setDate(nextDay.getDate() + 1);
 
       const count = await ActivityLog.countDocuments({
+        ...activityFilter,
         timestamp: { $gte: date, $lt: nextDay }
       });
 
@@ -107,6 +168,7 @@ class AnalyticsService {
 
     // 6. Upcoming Deadlines (Tasks due in the future)
     const upcomingDeadlines = await Task.find({
+      ...taskFilter,
       dueDate: { $gte: new Date() },
       status: { $ne: 'Done' }
     })
@@ -117,7 +179,7 @@ class AnalyticsService {
       .select('title dueDate project assignee priority');
 
     // 7. Recent Activities
-    const recentActivities = await ActivityLog.find()
+    const recentActivities = await ActivityLog.find(activityFilter)
       .sort({ timestamp: -1 })
       .limit(10);
 

@@ -77,13 +77,17 @@ function App() {
                     
                     {/* Admin Only Routing */}
                     <Route element={<ProtectedRoute allowedRoles={['Admin']} />}>
-                      <Route path="/employees" element={<Employees />} />
-                      <Route path="/manage-users" element={<Navigate to="/employees" replace />} />
                       <Route path="/projects/create" element={<Navigate to="/projects" state={{ openCreate: true }} replace />} />
                       <Route path="/analytics" element={<Navigate to="/dashboard" replace />} />
                       <Route path="/reports" element={<Reports />} />
                       <Route path="/departments" element={<Departments />} />
                       <Route path="/activity-logs" element={<ActivityLogs />} />
+                    </Route>
+
+                    {/* Admin & Manager Routing */}
+                    <Route element={<ProtectedRoute allowedRoles={['Admin', 'Manager']} />}>
+                      <Route path="/employees" element={<Employees />} />
+                      <Route path="/manage-users" element={<Navigate to="/employees" replace />} />
                     </Route>
 
                     {/* Manager Only Routing */}

@@ -196,7 +196,7 @@ export const TaskForm = ({ task, employees = [], projects = [], onSuccess, onCan
                   value: e._id,
                   label: e.name,
                   avatar: e.avatar,
-                  subtitle: e.designation
+                  subtitle: `${e.designation} • ${e.email}`
                 }))}
                 value={field.value}
                 onChange={field.onChange}

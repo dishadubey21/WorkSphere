@@ -111,6 +111,21 @@ export const Calendar = () => {
       }
     });
 
+    // Sort dayEvents: Approved Leaves should show first (above tasks/pending leaves), then Pending Leaves, then Tasks
+    dayEvents.sort((a, b) => {
+      const isApprovedLeaveA = a.type === 'leave' && a.raw.status === 'Approved';
+      const isApprovedLeaveB = b.type === 'leave' && b.raw.status === 'Approved';
+      
+      if (isApprovedLeaveA && !isApprovedLeaveB) return -1;
+      if (!isApprovedLeaveA && isApprovedLeaveB) return 1;
+      
+      // Place any leaves before tasks
+      if (a.type === 'leave' && b.type === 'task') return -1;
+      if (a.type === 'task' && b.type === 'leave') return 1;
+      
+      return 0;
+    });
+
     return dayEvents;
   };
 

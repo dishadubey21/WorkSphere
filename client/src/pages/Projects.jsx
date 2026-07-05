@@ -193,7 +193,7 @@ export const ProjectForm = ({ project, employees = [], onSuccess, onCancel }) =>
               value: emp._id,
               label: emp.name,
               avatar: emp.avatar,
-              subtitle: emp.designation
+              subtitle: `${emp.designation} • ${emp.email}`
             }))}
             value={field.value}
             onChange={field.onChange}
@@ -215,7 +215,7 @@ export const ProjectForm = ({ project, employees = [], onSuccess, onCancel }) =>
               value: emp._id,
               label: emp.name,
               avatar: emp.avatar,
-              subtitle: emp.designation
+              subtitle: `${emp.designation} • ${emp.email}`
             }))}
             value={field.value}
             onChange={field.onChange}

@@ -1,7 +1,9 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 
 // Import middlewares
@@ -26,7 +28,6 @@ import analyticsRoutes from './routes/analytics.routes.js';
 import meetingRoutes from './routes/meeting.routes.js';
 import settingsRoutes from './routes/settings.routes.js';
 
-dotenv.config();
 
 const app = express();
 
