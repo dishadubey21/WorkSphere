@@ -94,6 +94,50 @@ class EmployeeService {
       throw error;
     }
 
+    const isSelf = requestingUser && requestingUser._id.toString() === employee._id.toString();
+    const isAdmin = requestingUser && requestingUser.role === 'Admin';
+    const isManager = requestingUser && requestingUser.role === 'Manager';
+
+    if (!isAdmin && !isSelf) {
+      if (isManager) {
+        let isUnderManager = false;
+        if (employee.manager && employee.manager.toString() === requestingUser._id.toString()) {
+          isUnderManager = true;
+        } else if (employee.department) {
+          const dept = await Department.findById(employee.department);
+          if (dept && dept.head && dept.head.toString() === requestingUser._id.toString()) {
+            isUnderManager = true;
+          }
+        }
+        if (!isUnderManager) {
+          const error = new Error('Forbidden: You can only update details of employees under your management');
+          error.statusCode = 403;
+          throw error;
+        }
+
+        // Restrict Manager to only modifying the 'role' field
+        const modifiedFields = Object.keys(data).filter(key => {
+          const val1 = data[key];
+          const val2 = employee[key];
+          if (val1 === undefined) return false;
+          if (val1 === val2) return false;
+          const str1 = val1 !== null ? val1.toString() : '';
+          const str2 = val2 !== null && val2 !== undefined ? val2.toString() : '';
+          return str1 !== str2;
+        });
+
+        if (modifiedFields.length > 0 && (modifiedFields.length > 1 || !modifiedFields.includes('role'))) {
+          const error = new Error('Forbidden: Managers are only authorized to change roles (promotions/demotions), not edit other employee details');
+          error.statusCode = 403;
+          throw error;
+        }
+      } else {
+        const error = new Error('Forbidden: You do not have permission to update this employee');
+        error.statusCode = 403;
+        throw error;
+      }
+    }
+
     if (data.email && data.email !== employee.email) {
       const existing = await Employee.findOne({ email: data.email });
       if (existing) {
@@ -108,7 +152,24 @@ class EmployeeService {
     const newRole = data.role;
 
     if (roleChanged) {
-      if (!requestingUser || requestingUser.role !== 'Admin') {
+      if (!requestingUser) {
+        const error = new Error('Forbidden: Authentication required');
+        error.statusCode = 403;
+        throw error;
+      }
+
+      if (requestingUser.role === 'Manager') {
+        if (newRole !== 'Team Lead' && newRole !== 'Employee') {
+          const error = new Error('Forbidden: Managers can only change roles to Team Lead or Employee');
+          error.statusCode = 403;
+          throw error;
+        }
+        if (employee.role === 'Admin' || employee.role === 'Manager') {
+          const error = new Error('Forbidden: Cannot modify roles of higher or equal level administrative users');
+          error.statusCode = 403;
+          throw error;
+        }
+      } else if (requestingUser.role !== 'Admin') {
         const error = new Error('Forbidden: Only Administrators can modify employee roles');
         error.statusCode = 403;
         throw error;

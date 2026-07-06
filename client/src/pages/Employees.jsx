@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { useUI } from '../context/UIContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 // Design System
 import Drawer from '../design-system/Drawer.jsx';
@@ -208,6 +209,8 @@ export const EmployeeForm = ({ employee, departments = [], employees = [], onSuc
 export const Employees = () => {
   const queryClient = useQueryClient();
   const { activeDrawer, openDrawer, closeDrawer, showToast } = useUI();
+  const { user: currentUser } = useAuth();
+  const currentRole = currentUser?.role;
 
   // Search & Pagination States
   const [search, setSearch] = useState('');
@@ -375,9 +378,11 @@ export const Employees = () => {
           <option value="joiningDate:desc">Newest Hired</option>
           <option value="joiningDate:asc">Oldest Hired</option>
         </select>
-        <Button onClick={() => openDrawer('EMPLOYEE_CREATE')} icon={<Icons.Plus size={16} />}>
-          Add Employee
-        </Button>
+        {currentRole === 'Admin' && (
+          <Button onClick={() => openDrawer('EMPLOYEE_CREATE')} icon={<Icons.Plus size={16} />}>
+            Add Employee
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -399,8 +404,8 @@ export const Employees = () => {
           emptyIllustration="employees"
           emptyTitle="No Employees Found"
           emptyDescription="Start building your workforce directory by adding a new employee profile."
-          emptyActionLabel="Add Employee"
-          onEmptyAction={() => openDrawer('EMPLOYEE_CREATE')}
+          emptyActionLabel={currentRole === 'Admin' ? "Add Employee" : undefined}
+          onEmptyAction={currentRole === 'Admin' ? () => openDrawer('EMPLOYEE_CREATE') : undefined}
           pagination={pagination}
           onPageChange={setPage}
           filters={filterElements}
@@ -452,121 +457,143 @@ export const Employees = () => {
                   >
                     Manage <Icons.ChevronDown size={12} />
                   </button>
-                  {openDropdownId === emp._id && (
-                    <div 
-                      className="position-absolute bg-white border border-light rounded-3 shadow-lg py-1.5 z-3 end-0 animate-slideUp"
-                      style={{ minWidth: '170px', top: '100%', marginTop: '4px' }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => { openDrawer('EMPLOYEE_EDIT', emp); setOpenDropdownId(null); }}
-                        className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-dark hover-bg-light"
-                      >
-                        <Icons.Edit size={14} className="me-2 text-ws-primary" /> Edit Details
-                      </button>
-                      
-                      {/* Change Role Section */}
-                      <div className="dropdown-divider border-light"></div>
-                      <div className="px-3 py-1 text-muted fs-9 fw-semibold text-uppercase" style={{ letterSpacing: '0.5px' }}>Change Role</div>
-                      {emp.role !== 'Manager' && emp.role !== 'Admin' && (
-                        <button
-                          type="button"
-                          onClick={() => { updateRoleMutation.mutate({ id: emp._id, role: 'Manager' }); setOpenDropdownId(null); }}
-                          className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-dark hover-bg-light"
-                        >
-                          Promote to Manager
-                        </button>
-                      )}
-                      {emp.role !== 'Team Lead' && emp.role !== 'Admin' && (
-                        <button
-                          type="button"
-                          onClick={() => { updateRoleMutation.mutate({ id: emp._id, role: 'Team Lead' }); setOpenDropdownId(null); }}
-                          className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-dark hover-bg-light"
-                        >
-                          Promote to Team Lead
-                        </button>
-                      )}
-                      {emp.role !== 'Admin' && (
-                        <button
-                          type="button"
-                          onClick={() => { updateRoleMutation.mutate({ id: emp._id, role: 'Admin' }); setOpenDropdownId(null); }}
-                          className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-dark hover-bg-light"
-                        >
-                          Promote to Admin
-                        </button>
-                      )}
-                      {emp.role !== 'Employee' && emp.role !== 'Admin' && (
-                        <button
-                          type="button"
-                          onClick={() => { updateRoleMutation.mutate({ id: emp._id, role: 'Employee' }); setOpenDropdownId(null); }}
-                          className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-dark hover-bg-light"
-                        >
-                          Demote to Employee
-                        </button>
-                      )}
+                  {openDropdownId === emp._id && (() => {
+                    const isSelf = emp._id === currentUser?._id;
+                    const isEmpUnderManager = 
+                      emp.manager?._id === currentUser?._id || 
+                      (emp.department && departments.some(d => d._id === (emp.department?._id || emp.department) && d.head === currentUser?._id));
 
-                      {/* Account Status Section */}
-                      {emp.role !== 'Admin' && (
-                        <>
-                          <div className="dropdown-divider border-light"></div>
-                          <div className="px-3 py-1 text-muted fs-9 fw-semibold text-uppercase" style={{ letterSpacing: '0.5px' }}>Account Status</div>
-                          {emp.status === 'Active' ? (
-                            <button
-                              type="button"
-                              onClick={() => { updateStatusMutation.mutate({ id: emp._id, status: 'Suspended' }); setOpenDropdownId(null); }}
-                              className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-danger hover-bg-danger-light"
-                            >
-                              Suspend Account
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => { updateStatusMutation.mutate({ id: emp._id, status: 'Active' }); setOpenDropdownId(null); }}
-                              className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-success hover-bg-success-light"
-                            >
-                              Activate Account
-                            </button>
-                          )}
-                        </>
-                      )}
+                    const canEdit = currentRole === 'Admin';
+                    const canChangeRole = currentRole === 'Admin' || (currentRole === 'Manager' && isEmpUnderManager && !isSelf && emp.role !== 'Admin' && emp.role !== 'Manager');
 
-                      {/* Password / Logs Section */}
-                      <div className="dropdown-divider border-light"></div>
-                      <button
-                        type="button"
-                        onClick={() => { 
-                          setTargetEmployee(emp); 
-                          resetPasswordMutation.mutate(emp._id); 
-                          setOpenDropdownId(null); 
-                        }}
-                        className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-dark hover-bg-light"
+                    return (
+                      <div 
+                        className="position-absolute bg-white border border-light rounded-3 shadow-lg py-1.5 z-3 end-0 animate-slideUp"
+                        style={{ minWidth: '170px', top: '100%', marginTop: '4px' }}
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        <Icons.Alert size={14} className="me-2 text-warning" /> Reset Password
-                      </button>
-                      
-                      <a
-                        href={`/activity-logs?user=${encodeURIComponent(emp.name)}`}
-                        onClick={() => setOpenDropdownId(null)}
-                        className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-dark hover-bg-light text-decoration-none d-block"
-                      >
-                        <Icons.Menu size={14} className="me-2 text-info" /> View Activity
-                      </a>
-
-                      {emp.role !== 'Admin' && (
-                        <>
-                          <div className="dropdown-divider border-light"></div>
+                        {canEdit && (
                           <button
                             type="button"
-                            onClick={() => { handleDelete(emp._id); setOpenDropdownId(null); }}
-                            className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-danger hover-bg-danger-light"
+                            onClick={() => { openDrawer('EMPLOYEE_EDIT', emp); setOpenDropdownId(null); }}
+                            className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-dark hover-bg-light"
                           >
-                            <Icons.Trash size={14} className="me-2 text-danger" /> Delete
+                            <Icons.Edit size={14} className="me-2 text-ws-primary" /> Edit Details
                           </button>
-                        </>
-                      )}
-                    </div>
-                  )}
+                        )}
+                        
+                        {/* Change Role Section */}
+                        {canChangeRole && (
+                          <>
+                            <div className="dropdown-divider border-light"></div>
+                            <div className="px-3 py-1 text-muted fs-9 fw-semibold text-uppercase" style={{ letterSpacing: '0.5px' }}>Change Role</div>
+                            
+                            {currentRole === 'Admin' && emp.role !== 'Manager' && (
+                              <button
+                                type="button"
+                                onClick={() => { updateRoleMutation.mutate({ id: emp._id, role: 'Manager' }); setOpenDropdownId(null); }}
+                                className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-dark hover-bg-light"
+                              >
+                                Promote to Manager
+                              </button>
+                            )}
+                            
+                            {emp.role !== 'Team Lead' && (
+                              <button
+                                type="button"
+                                onClick={() => { updateRoleMutation.mutate({ id: emp._id, role: 'Team Lead' }); setOpenDropdownId(null); }}
+                                className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-dark hover-bg-light"
+                              >
+                                Promote to Team Lead
+                              </button>
+                            )}
+                            
+                            {currentRole === 'Admin' && emp.role !== 'Admin' && (
+                              <button
+                                type="button"
+                                onClick={() => { updateRoleMutation.mutate({ id: emp._id, role: 'Admin' }); setOpenDropdownId(null); }}
+                                className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-dark hover-bg-light"
+                              >
+                                Promote to Admin
+                              </button>
+                            )}
+                            
+                            {emp.role !== 'Employee' && (currentRole === 'Admin' || (currentRole === 'Manager' && emp.role === 'Team Lead')) && (
+                              <button
+                                type="button"
+                                onClick={() => { updateRoleMutation.mutate({ id: emp._id, role: 'Employee' }); setOpenDropdownId(null); }}
+                                className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-dark hover-bg-light"
+                              >
+                                Demote to Employee
+                              </button>
+                            )}
+                          </>
+                        )}
+
+                        {/* Account Status Section */}
+                        {currentRole === 'Admin' && emp.role !== 'Admin' && (
+                          <>
+                            <div className="dropdown-divider border-light"></div>
+                            <div className="px-3 py-1 text-muted fs-9 fw-semibold text-uppercase" style={{ letterSpacing: '0.5px' }}>Account Status</div>
+                            {emp.status === 'Active' ? (
+                              <button
+                                type="button"
+                                onClick={() => { updateStatusMutation.mutate({ id: emp._id, status: 'Suspended' }); setOpenDropdownId(null); }}
+                                className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-danger hover-bg-danger-light"
+                              >
+                                Suspend Account
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => { updateStatusMutation.mutate({ id: emp._id, status: 'Active' }); setOpenDropdownId(null); }}
+                                className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-success hover-bg-success-light"
+                              >
+                                Activate Account
+                              </button>
+                            )}
+                          </>
+                        )}
+
+                        {/* Password / Logs Section */}
+                        <div className="dropdown-divider border-light"></div>
+                        {currentRole === 'Admin' && (
+                          <button
+                            type="button"
+                            onClick={() => { 
+                              setTargetEmployee(emp); 
+                              resetPasswordMutation.mutate(emp._id); 
+                              setOpenDropdownId(null); 
+                            }}
+                            className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-dark hover-bg-light"
+                          >
+                            <Icons.Alert size={14} className="me-2 text-warning" /> Reset Password
+                          </button>
+                        )}
+                        
+                        <a
+                          href={`/activity-logs?user=${encodeURIComponent(emp.name)}`}
+                          onClick={() => setOpenDropdownId(null)}
+                          className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-dark hover-bg-light text-decoration-none d-block"
+                        >
+                          <Icons.Menu size={14} className="me-2 text-info" /> View Activity
+                        </a>
+
+                        {currentRole === 'Admin' && emp.role !== 'Admin' && (
+                          <>
+                            <div className="dropdown-divider border-light"></div>
+                            <button
+                              type="button"
+                              onClick={() => { handleDelete(emp._id); setOpenDropdownId(null); }}
+                              className="dropdown-item px-3 py-1.5 fs-8 text-start w-100 border-0 bg-transparent text-danger hover-bg-danger-light"
+                            >
+                              <Icons.Trash size={14} className="me-2 text-danger" /> Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </td>
             </tr>

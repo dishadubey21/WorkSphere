@@ -3,7 +3,43 @@ import taskService from '../services/task.service.js';
 export const getTasks = async (req, res, next) => {
   try {
     const { search, priority, status, assignee, project, page, limit } = req.query;
-    const assigneeFilter = req.user.role === 'Employee' ? req.user._id : assignee;
+    
+    let assigneeFilter = assignee;
+
+    if (req.user) {
+      if (req.user.role === 'Employee') {
+        assigneeFilter = req.user._id;
+      } else if (req.user.role === 'Manager') {
+        const Employee = (await import('../models/Employee.js')).default;
+        const Department = (await import('../models/Department.js')).default;
+        
+        const myDepts = await Department.find({ head: req.user._id });
+        const deptIds = myDepts.map(d => d._id);
+        
+        // Find all employees under the manager (including the manager themselves)
+        const subEmployees = await Employee.find({
+          $or: [
+            { _id: req.user._id },
+            { manager: req.user._id },
+            { department: { $in: deptIds } }
+          ]
+        }).select('_id');
+        
+        const allowedIds = subEmployees.map(e => e._id.toString());
+        
+        if (assignee) {
+          if (allowedIds.includes(assignee.toString())) {
+            assigneeFilter = assignee;
+          } else {
+            // Assignee not under this manager: query a new mock ID to return empty array
+            assigneeFilter = new (await import('mongoose')).default.Types.ObjectId();
+          }
+        } else {
+          assigneeFilter = { $in: allowedIds };
+        }
+      }
+    }
+
     const result = await taskService.getAll({ search, priority, status, assignee: assigneeFilter, project, page, limit });
     res.status(200).json({ success: true, ...result });
   } catch (error) {

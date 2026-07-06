@@ -5,13 +5,25 @@ export const getEmployees = async (req, res, next) => {
     const { search, department, designation, sort, page, limit } = req.query;
     
     let filter = {};
-    if (req.user && (req.user.role === 'Manager' || req.user.role === 'Team Lead')) {
-      const Team = (await import('../models/Team.js')).default;
-      const myTeams = await Team.find({ lead: req.user._id });
-      const memberIds = myTeams.flatMap(t => t.members.map(m => m.toString()));
-      // Always include themselves
-      memberIds.push(req.user._id.toString());
-      filter._id = { $in: memberIds };
+    if (req.user) {
+      if (req.user.role === 'Manager') {
+        const Department = (await import('../models/Department.js')).default;
+        const myDepts = await Department.find({ head: req.user._id });
+        const deptIds = myDepts.map(d => d._id);
+        
+        filter.$or = [
+          { _id: req.user._id },
+          { manager: req.user._id },
+          { department: { $in: deptIds } }
+        ];
+      } else if (req.user.role === 'Team Lead') {
+        const Team = (await import('../models/Team.js')).default;
+        const myTeams = await Team.find({ lead: req.user._id });
+        const memberIds = myTeams.flatMap(t => t.members.map(m => m.toString()));
+        // Always include themselves
+        memberIds.push(req.user._id.toString());
+        filter._id = { $in: memberIds };
+      }
     }
 
     const result = await employeeService.getAll({ search, department, designation, sort, page, limit, filter });

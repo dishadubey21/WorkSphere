@@ -32,11 +32,9 @@ export const getPingAuthUrl = async (req, res, next) => {
     }
 
     const discoveryUrl = process.env.AUTH_DISCOVERY_URL || '';
-    if (discoveryUrl.includes('..........') || !discoveryUrl) {
-      // Mock OIDC authorization redirect for local development bypass
-      logger.info('Using local Mock OIDC redirect for development bypass.');
-      const mockAuthUrl = `http://localhost:5173/callback?code=mock_development_code&state=${state}`;
-      return res.status(200).json({ success: true, authUrl: mockAuthUrl });
+    if (!discoveryUrl || discoveryUrl.includes('..........')) {
+      logger.error('Ping OIDC discovery URL is missing or contains placeholder values.');
+      return res.status(400).json({ success: false, message: 'Authentication service is temporarily misconfigured. Please try again later.' });
     }
 
     const oidc = await loadOidcConfig();
@@ -63,54 +61,15 @@ export const getPingAuthUrl = async (req, res, next) => {
 // @access  Public
 export const pingCallback = async (req, res, next) => {
   try {
-    const { code, codeVerifier, mockEmail } = req.body;
+    const { code, codeVerifier } = req.body;
     if (!code || !codeVerifier) {
       return res.status(400).json({ success: false, message: 'code and codeVerifier are required' });
     }
 
     const discoveryUrl = process.env.AUTH_DISCOVERY_URL || '';
-    if ((discoveryUrl.includes('..........') || !discoveryUrl) && code === 'mock_development_code') {
-      // Mock token validation & login bypass for local development
-      logger.info('Performing Mock OIDC login callback bypass.');
-      
-      const targetEmail = mockEmail || 'admin@worksphere.com';
-      let user = await Employee.findOne({ email: targetEmail }).populate('department', 'name code');
-      
-      if (!user) {
-        // Automatically create a mock user if they do not exist
-        const isDefaultAdmin = targetEmail === 'admin@worksphere.com';
-        user = await Employee.create({
-          name: isDefaultAdmin ? 'Ping Mock Admin' : 'Ping Mock Employee',
-          email: targetEmail,
-          password: crypto.randomBytes(16).toString('hex'),
-          role: isDefaultAdmin ? 'Admin' : 'Employee',
-          status: 'Active'
-        });
-        user = await Employee.findById(user._id).populate('department', 'name code');
-      }
-
-      // Enforce specific roles for developer testing compliance
-      let roleUpdated = false;
-      if (targetEmail === 'admin@worksphere.com' && user.role !== 'Admin') {
-        user.role = 'Admin';
-        roleUpdated = true;
-      } else if (targetEmail === 'david.chen@worksphere.com' && user.role !== 'Manager') {
-        user.role = 'Manager';
-        roleUpdated = true;
-      } else if (targetEmail === 'alex.mercer@worksphere.com' && user.role !== 'Team Lead') {
-        user.role = 'Team Lead';
-        roleUpdated = true;
-      } else if (targetEmail === 'devon.lane@worksphere.com' && user.role !== 'Employee') {
-        user.role = 'Employee';
-        roleUpdated = true;
-      }
-
-      if (roleUpdated) {
-        await user.save();
-        logger.info(`Enforced role '${user.role}' for development mock login: ${targetEmail}`);
-      }
-
-      return sendTokenResponse(user, 200, res);
+    if (!discoveryUrl || discoveryUrl.includes('..........')) {
+      logger.error('Ping OIDC discovery URL is missing or contains placeholder values.');
+      return res.status(400).json({ success: false, message: 'Authentication service is temporarily misconfigured. Please try again later.' });
     }
 
     const oidc = await loadOidcConfig();

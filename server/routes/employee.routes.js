@@ -20,7 +20,7 @@ router.route('/:id/reset-password')
 
 router.route('/:id')
   .get(adminOrManagerOrSelf, getEmployeeById)
-  .put(adminOrSelf, updateEmployee)
+  .put(adminOrManagerOrSelf, updateEmployee)
   .delete(authorize('Admin'), deleteEmployee);
 
 export default router;

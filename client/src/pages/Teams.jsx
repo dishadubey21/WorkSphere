@@ -133,7 +133,7 @@ export const TeamForm = ({ team, employees = [], departments = [], onSuccess, on
               value: e._id,
               label: e.name,
               avatar: e.avatar,
-              subtitle: e.designation
+              subtitle: `${e.designation} • ${e.email}`
             }))}
             value={field.value}
             onChange={field.onChange}
@@ -228,7 +228,7 @@ const MemberManager = ({ teamId, teams = [], employees = [], onClose }) => {
               value: e._id,
               label: e.name,
               avatar: e.avatar,
-              subtitle: e.designation
+              subtitle: `${e.designation} • ${e.email}`
             }))}
             value=""
             onChange={(val) => {
