@@ -68,9 +68,10 @@ export const Register = () => {
     setIsLoading(true);
     setApiError('');
     try {
-      await redirectToPing();
+      const registerUrl = import.meta.env.VITE_PING_REGISTER_URL || "https://openam-acnemea20230705.forgeblocks.com/am/XUI/?realm=/alpha&authIndexType=service&authIndexValue=WSRegistration#/";
+      window.location.href = registerUrl;
     } catch (err) {
-      const errorMsg = err.message || 'Failed to redirect to Ping AIC authorization server.';
+      const errorMsg = err.message || 'Failed to redirect to Ping AIC registration page.';
       setApiError(errorMsg);
       showToast(errorMsg, 'danger');
       setIsLoading(false);

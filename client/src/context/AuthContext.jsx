@@ -55,13 +55,39 @@ export const AuthProvider = ({ children }) => {
 
   // Logout handler
   const logout = async () => {
+    let logoutUrl = null;
     try {
-      await apiClient.post('/auth/logout');
+      const res = await apiClient.post('/auth/logout');
+      if (res && res.success && res.logoutUrl) {
+        logoutUrl = res.logoutUrl;
+      }
     } catch (err) {
       console.error('Logout request failed', err);
     } finally {
       setUser(null);
       queryClient.clear();
+
+      // Clear transient OIDC storage (sessionStorage and localStorage PKCE verifiers/states)
+      sessionStorage.removeItem('ping_auth_state');
+      sessionStorage.removeItem('ping_auth_verifier');
+
+      // Sweep storage to completely clear any other OIDC/PKCE keys
+      for (const storage of [localStorage, sessionStorage]) {
+        const keysToRemove = [];
+        for (let i = 0; i < storage.length; i++) {
+          const key = storage.key(i);
+          if (key && (key.includes('ping_auth') || key.includes('oidc') || key.includes('pkce') || key.includes('verifier') || key.includes('state'))) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(key => storage.removeItem(key));
+      }
+
+      if (logoutUrl) {
+        window.location.href = logoutUrl;
+      } else {
+        window.location.href = '/login';
+      }
     }
   };
 

@@ -193,7 +193,7 @@ export const pingCallback = async (req, res, next) => {
     }
 
     // Issue standard cookie and token response
-    sendTokenResponse(user, 200, res);
+    sendTokenResponse(user, 200, res, id_token);
   } catch (err) {
     logger.error('OIDC token exchange and login failed:', err.response?.data || err.message);
     res.status(500).json({ success: false, message: err.response?.data?.error_description || err.message });
@@ -202,7 +202,7 @@ export const pingCallback = async (req, res, next) => {
 
 
 // Helper to sign JWT and generate cookie response
-const sendTokenResponse = (user, statusCode, res) => {
+const sendTokenResponse = (user, statusCode, res, oidcIdToken = null) => {
   const secret = process.env.JWT_SECRET || 'worksphere_jwt_secret_phrase_2026';
   const token = jwt.sign({ id: user._id }, secret, {
     expiresIn: '30d'
@@ -217,6 +217,10 @@ const sendTokenResponse = (user, statusCode, res) => {
     sameSite: isProduction ? "none" : "lax",
     path: "/"
   };
+
+  if (oidcIdToken) {
+    res.cookie('oidc_id_token', oidcIdToken, cookieOptions);
+  }
 
   res
     .status(statusCode)
@@ -311,7 +315,6 @@ export const logout = async (req, res) => {
   try {
     const isProduction = process.env.NODE_ENV === "production";
 
-
     res.clearCookie("token", {
       httpOnly: true,
       secure: isProduction,
@@ -319,9 +322,33 @@ export const logout = async (req, res) => {
       path: "/",
     });
 
+    res.clearCookie("oidc_id_token", {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "none" : "lax",
+      path: "/",
+    });
+
+    let logoutUrl = null;
+    try {
+      const oidc = await loadOidcConfig();
+      const idTokenHint = req.cookies?.oidc_id_token;
+      if (oidc && oidc.end_session_endpoint && idTokenHint) {
+        const params = new URLSearchParams({
+          id_token_hint: idTokenHint,
+          client_id: process.env.CLIENT_ID || 'WorkSphere',
+          post_logout_redirect_uri: process.env.POST_LOGOUT_REDIRECT_URI || 'http://localhost:5173/login'
+        });
+        logoutUrl = `${oidc.end_session_endpoint}?${params.toString()}`;
+      }
+    } catch (oidcErr) {
+      logger.error('Failed to load OIDC config for logout:', oidcErr.message);
+    }
+
     res.status(200).json({
       success: true,
       message: "Successfully logged out",
+      logoutUrl
     });
   } catch (err) {
     res.status(500).json({
